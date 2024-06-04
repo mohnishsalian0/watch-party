@@ -18,5 +18,18 @@
       "128": "images/icon-128.png"
     }
   },
-  "permissions": ["activeTab"]
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["js/emote-cannon.js"],
+      "match_about_blank": true
+    }
+  ],
+  "permissions": ["activeTab"],
+  "web_accessible_resources": [
+    {
+      "resources": [ "styles.css", "pages/emote-tray.html" ],
+      "matches": [ "<all_urls>" ]
+    }
+  ]
 }

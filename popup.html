@@ -1,92 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="preconnect" href="https://fonts.googleapis.com">
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
-	<title>My Chrome Extension</title>
-	<style>
-		html {
-			background-color: #fff;
-			border-radius: 10px;
-			background-color: #000;
-			background-image: url("images/background.jpg");
-			background-size: cover;
-			opacity: 0.9;
-		}
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline'">
+		<title>My Chrome Extension</title>
+		<link rel="stylesheet" href="styles.css">
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+		<script src="js/htmx.min.js"></script>
+	</head>
 
-		body {
-			font-family: Inter, Arial, sans-serif;
-			text-align: center;
-			background-color: rgba(0, 0, 0, 0.6);
-			border: 1px solid rgba(128, 128, 128, 0.4);
-			min-width: 360px;
-			min-height: 480px;
-			border-radius: 20px;
-			box-shadow: 0px 0px 20px 0px rgba(0, 0, 0, 0.15), 0px 25px 30px 0px rgba(0, 0, 0, 0.35);
-			backdrop-filter: blur(30px);
-		}
-
-		h5 {
-			font-size: 1.5rem;
-			font-weight: 500;
-			letter-spacing: -0.02em;
-			line-height: 1.125rem;
-			color: #fff;
-			margin: 0;
-		}
-
-		p {
-			font-size: 0.875rem;
-			font-weight: 200;
-			letter-spacing: -0.02em;
-			line-height: 1.125rem;
-			color: rgba(255, 255, 255, 0.4);
-			margin: 0;
-		}
-
-		.card {
-			height: 100%;
-			display: flex;
-			flex-direction: column;
-			gap: 2rem;
-			/* justify-content: space-between; */
-			align-items: center;
-			padding: 32px 24px;
-		}
-
-		.text-stack {
-			display: flex;
-			flex-direction: column;
-			gap: 0.75rem;
-		}
-
-		.btn-primary {
-			border: none;
-			cursor: pointer;
-			background-color: #991B1B;
-			border-radius: 0.5rem;
-			color: #fff;
-			padding: 0.625rem 1rem;
-			font-size: 1rem;
-			line-height: 1.5rem;
-		}
-	</style>
-</head>
-
-<body>
-	<div class='card'>
-		<img src="images/logo.png" width="128px" style="padding:0.5rem;flex:1" />
-		<div class='text-stack'>
-			<h5>🍿Watch Party🥳</h5>
-			<p>Because movies are always better with friends & family who constantly rewind, give spoilers, stare at their
-				phones, and ask a million questions!</p>
+	<body id='body'>
+		<div class='card'>
+			<h1 class="logo">📺</h1>
+			<div class='text-stack'>
+			<h5>🍿 Watch Party 🎉</h5>
+				<p>Because movies are always better with friends & family who rewind constantly, reveal spoilers, stare at their
+					phones, and ask a million questions!</p>
+			</div>
+			<div>
+				<div class='flex rounded-lg'>
+					<button id='avatar-btn' class="btn-text flex border rounded-lg rounded-r-none border-r p-0">
+				<img id='avatar' src='https://api.dicebear.com/8.x/adventurer/svg?seed=22' class='w-7 rounded-full'/>
+					</button>
+					<input type='text' placeholder='Type your name here...' class='msg-inpt rounded-l-none'/>
+				</div>
+				<button class='btn-primary mt-3' style='width:100%;' hx-get='pages/session.html' hx-target='#body'>Start a watch party</button>
+			</div>
 		</div>
-		<button class='btn-primary' style='width:100%;'>Start a watch party</button>
-	</div>
-</body>
-
+	</body>
+	<script src="js/popup.js"></script>
 </html>
