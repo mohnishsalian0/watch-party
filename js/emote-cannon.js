@@ -30,25 +30,16 @@ function handleFullscreen(event) {
 	shadowRootContainer.id = 'shadow-root-container';
 	document.body.appendChild(shadowRootContainer);
 	const shadowRoot = shadowRootContainer.attachShadow({mode: 'open'});
-	
+
 	const linkElem = document.createElement('link');
 	linkElem.setAttribute('rel', 'stylesheet');
 	linkElem.setAttribute('href', chrome.runtime.getURL('styles.css'));
-	shadowRoot.appendChild(linkElem);
 
 	let emoteTray = chrome.runtime.getURL("pages/emote-tray.html");
 	const res = await fetch(emoteTray);
 	const html = await res.text();
-	const container = document.createElement('div');
-	container.id = 'emote-tray';
-	container.style.position = 'fixed';
-	container.style.width = 'auto';
-	container.style.height = 'auto';
-	container.style.bottom = '10px';
-	container.style.right = '10px';
-	container.style.zIndex = '3000';
-	container.innerHTML = html;
-	shadowRoot.appendChild(container);
+	shadowRoot.innerHTML = html;
+	shadowRoot.appendChild(linkElem);
 })().then(res => {
 		const shadowRoot = document.getElementById('shadow-root-container').shadowRoot;
 		const emotes = shadowRoot.querySelectorAll('#emote');

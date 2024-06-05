@@ -21,11 +21,10 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["js/emote-cannon.js"],
-      "match_about_blank": true
+      "js": ["js/emote-cannon.js", "js/video-player.js"]
     }
   ],
-  "permissions": ["activeTab"],
+  "permissions": ["activeTab", "storage"],
   "web_accessible_resources": [
     {
       "resources": [ "styles.css", "pages/emote-tray.html" ],
