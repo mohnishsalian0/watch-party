@@ -6,3 +6,12 @@ video.addEventListener('seeked', (e) => console.log('Video seek captured from wa
 } else {
 	console.log('Watch party: No video found');
 }
+
+// var port = chrome.runtime.connect({name: "video"});
+// port.onMessage.addListener((msg) => {
+// 	console.log('Video player received: ', msg);
+// 	if (msg.pause === true) video.pause();
+// 	else if (msg.play === true) video.play();
+// 	else if (msg.seek === true) video.currentTime = msg.jumpTo;
+// 	else if (msg.playbackRate === true) video.playbackRate = msg.rate;
+// });

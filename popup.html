@@ -10,16 +10,16 @@
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
-		<script src="js/htmx.min.js"></script>
+		<!-- <script src="js/htmx.min.js"></script> -->
 		<script src="js/popup.js"></script
 	</head>
 
 	<body id='body'>
 		<div class='card'>
 			<h1 class="logo">📺</h1>
-			<div class='text-stack'>
+			<div>
 			<h5>🍿 Watch Party 🎉</h5>
-				<p>Because movies are always better with friends & family who rewind constantly, reveal spoilers, stare at their
+				<p class='mt-2'>Because movies are always better with friends & family who rewind constantly, reveal spoilers, stare at their
 					phones, and ask a million questions!</p>
 			</div>
 			<div>
@@ -27,10 +27,9 @@
 					<button id='get-avatar-btn' class="btn-text flex border rounded-lg rounded-r-none border-r p-0">
 						<img id='avatar' src='https://api.dicebear.com/8.x/adventurer/svg?seed=22' class='w-7 rounded-full'/>
 					</button>
-					<input id='name-field' type='text' placeholder='Type your name here...' class='msg-inpt rounded-l-none'/>
+					<input id='name-field' type='text' placeholder='Type your name here...' maxLength="10" class='msg-inpt rounded-l-none'/>
 				</div>
-				<!-- <button id='start-watch-party-btn' class='btn-primary mt-3' style='width:100%;' hx-get='pages/session.html' hx-target='#body'>Start a watch party</button> -->
-				<button id='start-watch-party-btn' class='btn-primary mt-3 w-full'>Start a watch party</button>
+				<button id='start-party-btn' class='btn-primary mt-3 w-full'>Start a watch party<object type="image/svg+xml" data="icons/rings.svg" class='invisible absolute'></object></button>
 			</div>
 		</div>
 	</body>

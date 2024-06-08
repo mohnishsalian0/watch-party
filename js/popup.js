@@ -3,12 +3,6 @@ function generateRandomAvatarUrl() {
 	return 'https://api.dicebear.com/8.x/adventurer/svg?seed=' + seed;
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-	console.log('Extension installed');
-	const avatarUrl = generateRandomAvatarUrl();
-	chrome.storage.local.set({ avatarUrl }).then(() => console.log('Avatar url saved:', avatarUrl));
-})
-
 document.addEventListener('DOMContentLoaded', () => {
 	chrome.storage.local.get(['avatarUrl']).then((result) => {
 		document.getElementById('avatar').src = result.avatarUrl;
@@ -16,8 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
 	})
 
 	chrome.storage.local.get(["name"]).then((result) => {
-		document.getElementById('name-field').value = result.name;
-		console.log("Name fetched: " + result.name);
+		const name = result.name || '';
+		document.getElementById('name-field').value = name;
+		console.log("Name fetched: " + name);
 	})
 
 	document.getElementById('get-avatar-btn').addEventListener('click', () => {
@@ -35,14 +30,23 @@ document.addEventListener('DOMContentLoaded', () => {
 		});
 	})
 
-	document.getElementById('start-watch-party-btn').addEventListener('click', () => {
-		fetch('pages/session-empty.html').then((res) => res.text()).then((html) => {
-			console.log('Loading empty session');
-			document.body.innerHTML = html;
+	document.getElementById('start-party-btn').addEventListener('click', (e) => {
+		const btn = e.target;
+		e.target.disabled = true;
+		const spinner = btn.querySelector('object');
+		btn.firstChild.textContent = '';
+		spinner.classList.remove('absolute');
+		spinner.classList.remove('invisible');
 
-			const script = document.createElement('script');
-			script.src = 'js/session-empty.js';
-			document.head.appendChild(script);
+		fetch('pages/session.html').then((res) => res.text()).then((html) => {
+			console.log('Loading empty session');
+			setTimeout(() => {
+				document.body.innerHTML = html;
+
+				const script = document.createElement('script');
+				script.src = 'js/session.js';
+				document.head.appendChild(script);
+				}, 0);
 		})
 	})
 })

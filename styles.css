@@ -12,7 +12,7 @@ body {
 	position: relative;
 	background-color: rgba(0, 0, 0, 0.6);
 	border: 1px solid rgba(128, 128, 128, 0.4);
-	min-width: 372px;
+	min-width: 360px;
 	min-height: 440px;
 	border-radius: 20px;
 	backdrop-filter: blur(30px);
@@ -47,7 +47,7 @@ h5 {
 	font-size: 1.5rem;
 	font-weight: 500;
 	letter-spacing: -0.02em;
-	line-height: 1.125rem;
+	line-height: 2rem;
 	color: #fff;
 	margin: 0;
 	display: inline;
@@ -108,9 +108,13 @@ input:focus-visible {
 	background-color: #991B1B;
 	border-radius: 0.5rem;
 	color: #fff;
+	height: 3rem;
 	padding: 0.625rem 1rem;
 	font-size: 1rem;
 	line-height: 1.5rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .btn-outlined {
@@ -188,17 +192,7 @@ input:focus-visible {
 .icon {
 	width: 1rem;
 	height: 1.5rem;
-}
-
-.session-link {
-	flex: 1;
-	min-height: 3rem;
-	box-sizing: border-box;
-	display: flex;
-	align-items: center;
-	padding: 0.625rem 1rem;
-	font-size: 0.875rem;
-	color: #fff;
+	pointer-events: none;
 }
 
 .msg-container {
@@ -257,16 +251,8 @@ input:focus-visible {
 	right: 0;
 }
 
-.right-10 {
-	right: 10px;
-}
-
 .bottom-0 {
 	bottom: 0;
-}
-
-.bottom-10 {
-	bottom: 10px;
 }
 
 /* Display */
@@ -283,16 +269,26 @@ input:focus-visible {
 	display: inline-block;
 }
 
+.none {
+	display: none;
+}
+
+/* Flex */
+
 .flex {
 	display: flex;
 }
 
-.flex-row {
-	flex-direction: row;
+.flex-col {
+	flex-direction: column;
 }
 
 .flex-wrap {
 	flex-wrap: wrap;
+}
+
+.grow {
+	flex-grow: 1;
 }
 
 /* Alignment */
@@ -331,6 +327,10 @@ input:focus-visible {
 
 .gap-2 {
 	gap: 0.5rem;
+}
+
+.gap-3 {
+	gap:0.75rem;
 }
 
 .gap-4 {
@@ -389,6 +389,16 @@ input:focus-visible {
 	padding: 0.5rem;
 }
 
+.py-3 {
+	padding-top: 0.75rem;
+	padding-bottom: 0.75rem;
+}
+
+.px-4 {
+	padding-left: 1rem;
+	padding-right: 1rem;
+}
+
 .pt-8 {
 	padding-top: 2rem;
 }
@@ -403,8 +413,16 @@ input:focus-visible {
 	width: 100%;
 }
 
+.w-8 {
+	width: 4rem;
+}
+
 .min-w-4 {
 	min-width: 2rem;
+}
+
+.min-w-6 {
+	min-width: 3rem;
 }
 
 .w-4 {
@@ -455,6 +473,12 @@ input:focus-visible {
 
 .h-fit {
 	height: fit-content;
+}
+
+/* Box Sizing */
+
+.box-border {
+	box-sizing: border-box;
 }
 
 .rounded-full {
@@ -537,6 +561,10 @@ input:focus-visible {
 	line-height: 1;
 }
 
+.leading-6 {
+	line-height: 1.5rem;
+}
+
 /* Font color */
 
 .font-white {
@@ -589,19 +617,34 @@ input:focus-visible {
 	scrollbar-width: none;
 }
 
+.overflow-hidden {
+	overflow: hidden;
+}
+
+.text-nowrap {
+	text-wrap: nowrap;
+}
+
+.text-ellipsis {
+	text-overflow: ellipsis;
+}
+
 /* The animation code */
-@keyframes example {
-  0%   {right:0px; opacity:1;}
-  100%  {right:120px; opacity:0;}
+@keyframes shoot {
+  0%   {right:0px}
+  100%  {right:120px}
+}
+
+@keyframes fade {
+	0% {opacity:1;}
+	100% {opacity:0;}
 }
 
 /* The element to apply the animation to */
-.anim {
+.emote {
 	font-size: 64px;
 	width: fit-content;
   position: fixed;
-  animation-name: example;
-  animation-duration: 3s;
-	animation-timing-function: ease-out;
-	animation-fill-mode: forwards;
+	user-select: none;
+	animation: shoot 3s cubic-bezier(0.09, 0.62, 0.92, 0.37), fade 3s linear forwards;
 }
