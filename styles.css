@@ -1,4 +1,3 @@
-
 html {
 	background-image: url("images/background.jpg");
 	background-size: cover;
@@ -330,7 +329,7 @@ input:focus-visible {
 }
 
 .gap-3 {
-	gap:0.75rem;
+	gap: 0.75rem;
 }
 
 .gap-4 {
@@ -631,20 +630,30 @@ input:focus-visible {
 
 /* The animation code */
 @keyframes shoot {
-  0%   {right:0px}
-  100%  {right:120px}
+	0% {
+		right: 0px
+	}
+
+	100% {
+		right: 120px
+	}
 }
 
 @keyframes fade {
-	0% {opacity:1;}
-	100% {opacity:0;}
+	0% {
+		opacity: 1;
+	}
+
+	100% {
+		opacity: 0;
+	}
 }
 
 /* The element to apply the animation to */
 .emote {
 	font-size: 64px;
 	width: fit-content;
-  position: fixed;
+	position: fixed;
 	user-select: none;
 	animation: shoot 3s cubic-bezier(0.09, 0.62, 0.92, 0.37), fade 3s linear forwards;
 }
