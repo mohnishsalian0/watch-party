@@ -1,5 +1,4 @@
 importScripts("socket.io.min.js");
-importScripts("remote-control.js");
 
 function setupRoomRelay() {
   socket.on("room:create", (payload) => {
@@ -81,6 +80,10 @@ chrome.runtime.onInstalled.addListener(() => {
     .then(() => console.log("Avatar url saved:", avatarUrl));
 });
 
+// Communication ports to popup-background & contentscript-background
+let popupPort;
+let contentscriptPort;
+
 const socket = io("http://localhost:3000", {
   auth: {
     userId: 123,
@@ -90,25 +93,19 @@ const socket = io("http://localhost:3000", {
   transports: ["websocket"],
 });
 
-socket.on("connect_error", (err) => {
-  console.log("[Background] Socket connection error:", err);
-});
+socket.on("connect", () => {
+  console.log("[Background] Socket connection established");
 
-// Communication ports between popup-background & contentscript-background
-let popupPort;
-let contentscriptPort;
+  chrome.runtime.onConnect.addListener(function (port) {
+    if (port.name === "popup-background") {
+      popupPort = port;
+      console.log("[Background] Connected to popup port");
+    } else if (port.name === "contentscript-background") {
+      contentscriptPort = port;
+      console.log("[Background] Connected to content script port");
+    }
 
-chrome.runtime.onConnect.addListener(function (port) {
-  if (port.name === "popup-background") {
-    popupPort = port;
-  } else if (contentscriptPort.name === "contentscript-background") {
-    contentscriptPort = port;
-  }
-
-  if (popupPort && contentscriptPort) {
-    socket.on("connect", () => {
-      console.log("[Background] Socket connection established");
-
+    if (popupPort && contentscriptPort) {
       // Pass content script message to socket
       contentscriptPort.onMessage.addListener((msg) => {
         console.log("[Background] Message received from content script: ", msg);
@@ -123,6 +120,10 @@ chrome.runtime.onConnect.addListener(function (port) {
 
       setupRoomRelay();
       setupVideoRelay();
-    });
-  }
+    }
+  });
+});
+
+socket.on("connect_error", (err) => {
+  console.log("[Background] Socket connection error:", err);
 });
