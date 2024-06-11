@@ -28,6 +28,7 @@
     "service_worker": "js/service-worker.js"
   },
   "permissions": ["activeTab", "storage"],
+  "host_permissions": ["http://www.localhost:3000/*"],
   "web_accessible_resources": [
     {
       "resources": [ "styles.css", "pages/emote-tray.html" ],

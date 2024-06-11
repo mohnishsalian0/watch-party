@@ -3,6 +3,8 @@ function generateRandomAvatarUrl() {
   return "https://api.dicebear.com/8.x/adventurer/svg?seed=" + seed;
 }
 
+var port = chrome.runtime.connect({ name: "popup-background" });
+
 document.addEventListener("DOMContentLoaded", () => {
   chrome.storage.local.get(["avatarUrl"]).then((result) => {
     document.getElementById("avatar").src = result.avatarUrl;
@@ -50,5 +52,9 @@ document.addEventListener("DOMContentLoaded", () => {
           document.head.appendChild(script);
         }, 0);
       });
+  });
+
+  document.getElementById("message").addEventListener("click", (e) => {
+    port.postMessage({ message: "Hello from popup" });
   });
 });
