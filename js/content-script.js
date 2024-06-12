@@ -112,78 +112,99 @@ function receiveEmoteReaction(port) {
       "[Watch party][Content script] Received message from background: ",
       msg,
     );
-    if (msg.topic === "chat:reaction") shootEmote();
+    if (msg.topic === "chat:reaction") shootEmote(msg.payload.reaction);
   });
 }
 
 function getVideoPlayer() {
-  return document.querySelector("video");
+  const video = document.querySelector("video");
+  if (video) console.log("[Watch party][Content script] Video player found!");
+  else console.log("[Watch party][Content script] No video found");
+  return video;
 }
 
-function forwardVideoPlayerCommands(video, port) {
-  if (video) {
-    video.addEventListener("play", () => {
-      console.log("[Watch party][Content script] Video resume captured");
-      port.postMessage({
-        topic: "video:play",
-        payload: {
-          room: "room1",
-        },
-      });
-    });
-
-    video.addEventListener("pause", () => {
-      console.log("[Watch party][Content script] Video pause captured");
-      port.postMessage({
-        topic: "video:pause",
-        payload: {
-          room: "room1",
-        },
-      });
-    });
-
-    video.addEventListener("seeked", () => {
-      console.log("[Watch party][Content script] Video seek captured");
-      port.postMessage({
-        topic: "video:seek",
-        payload: {
-          room: "room1",
-          timestamp: video.currentTime,
-        },
-      });
-    });
-  }
-}
-
-function receiveVideoPlayerCommands(video, port) {
-  if (video) {
-    port.onMessage.addListener((msg) => {
-      console.log(
-        "[Watch party][Content script] Received message from background: ",
-        msg,
+function forwardVideoEvent(event, port, message, consoleMessage) {
+  video.addEventListener(event, () => {
+    console.log("[Watch party][Content script]" + consoleMessage);
+    if (roomUrl) {
+      port.postMessage(message);
+    } else {
+      console.error(
+        "[Watch party][Content script] Room url not found in session storage",
       );
-      if (msg.topic === "video:pause") video.pause();
-      else if (msg.topic === "video:play") video.play();
-      else if (msg.topic === "video:seek") video.currentTime = msg.timestamp;
-      else if (msg.topic === "video:adjustPlaybackRate")
-        video.playbackRate = msg.rate;
-    });
-  } else {
-    console.log("[Watch party][Content script] No video found");
-  }
+    }
+  });
+}
+
+function forwardVideoEvents(video, port) {
+  forwardVideoEvent(
+    "play",
+    port,
+    {
+      topic: "video:play",
+      payload: {
+        room: "room1",
+      },
+    },
+    "Video resume captured",
+  );
+
+  forwardVideoEvent(
+    "pause",
+    port,
+    {
+      topic: "video:pause",
+      payload: {
+        room: "room1",
+      },
+    },
+    "Video pause captured",
+  );
+
+  forwardVideoEvent(
+    "seeked",
+    port,
+    {
+      topic: "video:seek",
+      payload: {
+        room: "room1",
+        timestamp: video.currentTime,
+      },
+    },
+    "Video seek captured",
+  );
+}
+
+function receiveVideoEvents(video, port) {
+  port.onMessage.addListener((msg) => {
+    console.log(
+      "[Watch party][Content script] Received message from background: ",
+      msg,
+    );
+    if (msg.topic === "video:pause") video.pause();
+    else if (msg.topic === "video:play") video.play();
+    else if (msg.topic === "video:seek") video.currentTime = msg.timestamp;
+    else if (msg.topic === "video:adjustPlaybackRate")
+      video.playbackRate = msg.rate;
+  });
 }
 
 var port = chrome.runtime.connect({ name: "contentscript-background" });
 
-// port.onMessage.addListener((msg) => {
-//   console.log("[Videoplayer] Message from remote: ", msg);
-// });
-//
-// port.postMessage("Hello from video player");
+var roomUrl;
+chrome.storage.sync.get(["roomUrl"]).then((result) => {
+  console.log(
+    "[Watch party][Content script] Fetched room url from session storage: ",
+    result,
+  );
+  roomUrl = result.roomUrl;
+});
 
 const video = getVideoPlayer();
-forwardVideoPlayerCommands(video, port);
-receiveVideoPlayerCommands(video, port);
+if (video) {
+  forwardVideoEvents(video, port);
+  receiveVideoEvents(video, port);
+}
 
 renderEmoteTray().then((shadowRoot) => {
   handleEmoteClick(shadowRoot, port);
