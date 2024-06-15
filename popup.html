@@ -1,36 +1,52 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="popup-html" lang="en">
 
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline'">
-	<title>My Chrome Extension</title>
+	<title>Watch Party Popup</title>
 	<link rel="stylesheet" href="styles.css">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
-	<!-- <script src="js/htmx.min.js"></script> -->
-	<script src="js/popup.js"></script
-	</head>
+	<script src="js/popup.js"></script>
+</head>
 
-	<body id='body'>
-		<div class='card'>
-			<h1 class="logo">📺</h1>
-			<div>
+<body class="popup-body" id='body'>
+	<div class='py-8 px-6'>
+		<h1 class='logo'>📺</h1>
+		<div class='mt-4'>
 			<h5>🍿 Watch Party 🎉</h5>
-				<p class='mt-2'>Because movies are always better with friends & family who rewind constantly, reveal spoilers, stare at their
-					phones, and ask a million questions!</p>
+			<p class='mt-2 font-white-40'>Because movies are always better with friends & family who rewind constantly, reveal
+				spoilers,
+				stare at their
+				phones, and ask a million questions!</p>
+		</div>
+		<div class='mt-8'>
+			<div class='flex rounded-lg'>
+				<button id='get-avatar-btn'
+					class="appearance-none border cursor-pointer min-w-6 min-h-6 rounded-lg rounded-r-none bg-transparent font-white-60 text-base hover-bg-white flex items-center justify-center">
+					<img id='avatar' src='https://api.dicebear.com/8.x/adventurer/svg?seed=22' class='w-7 rounded-full' />
+				</button>
+				<input id='name-input' type='text' placeholder='Type your name here...' maxLength="10"
+					class='grow min-h-6 appearance-none border-none rounded-lg rounded-l-none bg-white-15 box-border py-2 px-4 text-base font-white' />
 			</div>
-			<div>
-				<div class='flex rounded-lg'>
-					<button id='get-avatar-btn' class="btn-text flex border rounded-lg rounded-r-none border-r p-0">
-						<img id='avatar' src='https://api.dicebear.com/8.x/adventurer/svg?seed=22' class='w-7 rounded-full'/>
-					</button>
-					<input id='name-field' type='text' placeholder='Type your name here...' maxLength="10" class='msg-inpt rounded-l-none'/>
-				</div>
-				<button id='start-party-btn' class='btn-primary mt-3 w-full'>Start a watch party<object type="image/svg+xml" data="icons/rings.svg" class='invisible absolute'></object></button>
+			<!-- <div class='flex gap-2 mt-2'> -->
+			<button id='start-party-btn'
+				class='w-full mt-3 appearance-none border-none cursor-pointer h-6 rounded-lg bg-red font-white py-2 px-4 text-base hover-bg-red flex items-center justify-center'>Start
+				a watch party<object type="image/svg+xml" data="icons/rings.svg" class='invisible absolute'></object></button>
+			<!-- </div> -->
+			<p class='font-white-60 mt-3 select-none'>OR</p>
+			<div class='flex rounded-lg mt-3'>
+				<input id='url-input' type='text' placeholder='Enter the url here...'
+					class='grow min-h-6 appearance-none border-none rounded-lg rounded-r-none bg-white-15 box-border py-2 px-4 text-base font-white' />
+				<button id='join-room-btn'
+					class='appearance-none min-w-14 border cursor-pointer h-6 rounded-lg rounded-l-none bg-transparent font-white-60 py-2 px-4 text-base hover-bg-white flex items-center justify-center'>Join
+					room<object type="image/svg+xml" data="icons/rings.svg" class='invisible absolute'></object></button>
 			</div>
 		</div>
-	</body>
+	</div>
+</body>
+
 </html>

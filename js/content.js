@@ -1,3 +1,5 @@
+let isProgrammaticChange = false;
+
 function shootEmote(emote) {
   const shadow = document.getElementById("shadow-root-container").shadowRoot;
   const floatingEmote = document.createElement("h2");
@@ -22,7 +24,7 @@ function handleEmoteClick(shadowRoot, port) {
       shootEmote(emote);
       port.postMessage({
         topic: "chat:reaction",
-        payload: { room: "room1", reaction: emote },
+        payload: { reaction: emote },
       });
     });
   });
@@ -125,84 +127,75 @@ function getVideoPlayer() {
 
 function forwardVideoEvent(event, port, message, consoleMessage) {
   video.addEventListener(event, () => {
-    console.log("[Watch party][Content script]" + consoleMessage);
-    if (roomUrl) {
-      port.postMessage(message);
-    } else {
-      console.error(
-        "[Watch party][Content script] Room url not found in session storage",
-      );
+    if (isProgrammaticChange) {
+      isProgrammaticChange = false;
+      return;
     }
+    console.log("[Watch party][Content script]" + consoleMessage);
+    port.postMessage(message);
   });
 }
 
-function forwardVideoEvents(video, port) {
-  forwardVideoEvent(
-    "play",
-    port,
-    {
+function setupVideoListeners(video, port) {
+  video.addEventListener("play", () => {
+    if (isProgrammaticChange) {
+      isProgrammaticChange = false;
+      return;
+    }
+    console.log("[Watch party][Content script] Video resume captured");
+    port.postMessage({
       topic: "video:play",
-      payload: {
-        room: "room1",
-      },
-    },
-    "Video resume captured",
-  );
+      payload: {},
+    });
+  });
 
-  forwardVideoEvent(
-    "pause",
-    port,
-    {
+  video.addEventListener("pause", () => {
+    if (isProgrammaticChange) {
+      isProgrammaticChange = false;
+      return;
+    }
+    console.log("[Watch party][Content script] Video pause captured");
+    port.postMessage({
       topic: "video:pause",
-      payload: {
-        room: "room1",
-      },
-    },
-    "Video pause captured",
-  );
+      payload: {},
+    });
+  });
 
-  forwardVideoEvent(
-    "seeked",
-    port,
-    {
+  video.addEventListener("seeked", () => {
+    if (isProgrammaticChange) {
+      isProgrammaticChange = false;
+      return;
+    }
+    console.log("[Watch party][Content script] Video seek captured");
+    port.postMessage({
       topic: "video:seek",
-      payload: {
-        room: "room1",
-        timestamp: video.currentTime,
-      },
-    },
-    "Video seek captured",
-  );
+      payload: { timestamp: video.currentTime },
+    });
+  });
 }
 
 function receiveVideoEvents(video, port) {
   port.onMessage.addListener((msg) => {
-    console.log(
-      "[Watch party][Content script] Received message from background: ",
-      msg,
-    );
+    isProgrammaticChange = true;
     if (msg.topic === "video:pause") video.pause();
     else if (msg.topic === "video:play") video.play();
     else if (msg.topic === "video:seek") video.currentTime = msg.timestamp;
     else if (msg.topic === "video:adjustPlaybackRate")
       video.playbackRate = msg.rate;
+    console.log(
+      "[Watch party][Content script] Received message from background: ",
+      msg,
+    );
   });
 }
 
-var port = chrome.runtime.connect({ name: "contentscript-background" });
+// =============== INITIALIZATION ===============
 
-var roomUrl;
-chrome.storage.sync.get(["roomUrl"]).then((result) => {
-  console.log(
-    "[Watch party][Content script] Fetched room url from session storage: ",
-    result,
-  );
-  roomUrl = result.roomUrl;
-});
+var port = chrome.runtime.connect({ name: "contentscript-background" });
 
 const video = getVideoPlayer();
 if (video) {
-  forwardVideoEvents(video, port);
+  setupVideoListeners(video, port);
   receiveVideoEvents(video, port);
 }
 

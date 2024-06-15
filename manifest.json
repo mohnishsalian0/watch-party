@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Watch Party",
   "description": "Watch shows with your friends & family from anywhere across the world",
-  "version": "1.0",
+  "version": "1.0.0",
   "icons": {
     "16": "images/icon-16.png",
     "32": "images/icon-32.png",
@@ -18,16 +18,13 @@
       "128": "images/icon-128.png"
     }
   },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["js/content-script.js"]
-    }
-  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
   "background": {
     "service_worker": "js/background.js"
   },
-  "permissions": ["activeTab", "storage"],
+  "permissions": ["activeTab", "scripting", "sidePanel", "storage"],
   "host_permissions": ["http://www.localhost:3000/*"],
   "web_accessible_resources": [
     {
