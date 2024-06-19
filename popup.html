@@ -14,37 +14,44 @@
 </head>
 
 <body class="popup-body" id='body'>
-	<div class='py-8 px-6'>
-		<h1 class='logo'>📺</h1>
-		<div class='mt-4'>
-			<h5>🍿 Watch Party 🎉</h5>
-			<p class='mt-2 font-white-40'>Because movies are always better with friends & family who rewind constantly, reveal
-				spoilers,
-				stare at their
-				phones, and ask a million questions!</p>
+	<div class='py-6 px-4'>
+		<h1 class='logo text-center'>📺</h1>
+		<div class='mt-4 text-center'>
+			<h5 class=''>🍿 Watch Party 🎉</h5>
+			<!-- <p class='mt-2 font-white-50'>Because shows are always better with friends & family who rewind constantly and -->
+			<!-- 	ask a million questions!</p> -->
+			<p class='mt-2 font-white-50 text-center'>Enter a unique name for your room and ensure all participants have used
+				the exact
+				same name. No special characters allowed.</p>
+			<p class='mt-2 font-white-50'></p>
 		</div>
 		<div class='mt-8'>
-			<div class='flex rounded-lg'>
+			<div class='flex rounded-md'>
 				<button id='get-avatar-btn'
-					class="appearance-none border cursor-pointer min-w-6 min-h-6 rounded-lg rounded-r-none bg-transparent font-white-60 text-base hover-bg-white flex items-center justify-center">
+					class="appearance-none border cursor-pointer w-6 h-6 p-0 rounded-md rounded-r-none bg-transparent font-white-60 text-sm hover-bg-white flex items-center justify-center">
 					<img id='avatar' src='https://api.dicebear.com/8.x/adventurer/svg?seed=22' class='w-7 rounded-full' />
 				</button>
-				<input id='name-input' type='text' placeholder='Type your name here...' maxLength="10"
-					class='grow min-h-6 appearance-none border-none rounded-lg rounded-l-none bg-white-15 box-border py-2 px-4 text-base font-white' />
+				<input id='name-input' type='text' placeholder='Type your name here...' maxLength="20" pattern="[a-z0-9 ]+"
+					class='grow h-6 appearance-none border-none rounded-md rounded-l-none bg-white-15 box-border py-2 px-4 text-sm font-white focus-border' />
 			</div>
-			<!-- <div class='flex gap-2 mt-2'> -->
-			<button id='start-party-btn'
-				class='w-full mt-3 appearance-none border-none cursor-pointer h-6 rounded-lg bg-red font-white py-2 px-4 text-base hover-bg-red flex items-center justify-center'>Start
-				a watch party<object type="image/svg+xml" data="icons/rings.svg" class='invisible absolute'></object></button>
-			<!-- </div> -->
-			<p class='font-white-60 mt-3 select-none'>OR</p>
-			<div class='flex rounded-lg mt-3'>
-				<input id='url-input' type='text' placeholder='Enter the url here...'
-					class='grow min-h-6 appearance-none border-none rounded-lg rounded-r-none bg-white-15 box-border py-2 px-4 text-base font-white' />
+			<p id='name-help-text' class='text-xs hidden font-red mt-1'>Only letters, numbers, and spaces are allowed in name
+			</p>
+			<div class='flex rounded-md mt-3'>
+				<input id='room-input' type='text' placeholder='Enter room name here...' maxlength="50" pattern="[a-z0-9_]+"
+					class='grow h-6 w-full h-full appearance-none border border-r-none rounded-md rounded-r-none bg-transparent box-border py-2 px-4 text-sm font-white focus-border'
+					style='border-right: none;' />
+				<button id='get-room-name-btn' title='Generate random name'
+					class="appearance-none border-none border-x cursor-pointer w-6 h-6 p-0 bg-transparent px-4">
+					<img id='avatar' src='icons/dice.svg' class='align-middle pointer-events-none' />
+				</button>
 				<button id='join-room-btn'
-					class='appearance-none min-w-14 border cursor-pointer h-6 rounded-lg rounded-l-none bg-transparent font-white-60 py-2 px-4 text-base hover-bg-white flex items-center justify-center'>Join
-					room<object type="image/svg+xml" data="icons/rings.svg" class='invisible absolute'></object></button>
+					class='min-w-12 appearance-none border-none cursor-pointer h-6 rounded-md rounded-l-none bg-red font-white py-2 px-4 text-sm text-nowrap hover-bg-red flex items-center justify-center'>Join
+					room<object id='spinner' type="image/svg+xml" data="icons/rings.svg"
+						class='invisible absolute'></object></button>
 			</div>
+			<p id='room-help-text' class='text-xs hidden font-red mt-1'>Only lowercase letters, numbers, and underscores (_)
+				are
+				allowed in room name</p>
 		</div>
 	</div>
 </body>

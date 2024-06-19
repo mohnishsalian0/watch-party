@@ -1,0 +1,94 @@
+.hidden {
+	display: none;
+}
+
+/* The animation code */
+@keyframes shoot {
+	0% {
+		right: 0px
+	}
+
+	100% {
+		right: 120px
+	}
+}
+
+@keyframes fade {
+	0% {
+		opacity: 1;
+	}
+
+	100% {
+		opacity: 0;
+	}
+}
+
+/* The element to apply the animation to */
+.emote-tray {
+	position: fixed;
+	z-index: 10000;
+	right: 0;
+	bottom: 0;
+	overflow: auto;
+	scrollbar-width: none;
+	width: fit-content;
+	height: fit-content;
+}
+
+.emote-tray:hover .round-frame {
+	width: 140px;
+	height: 140px;
+}
+
+.emote-tray:hover .emote-hide {
+	display: none
+}
+
+.emote-tray:hover .emotes-container {
+	visibility: visible;
+}
+
+.round-frame {
+	width: 40px;
+	height: 40px;
+	overflow: hidden;
+	padding: 4px;
+	background-color: rgba(0, 0, 0, 0.6);
+	border: 1px solid rgba(128, 128, 128, 0.4);
+	border-radius: 9999px;
+	transition: width 300ms, height 300ms;
+}
+
+.emotes-container {
+	width: 140px;
+	height: 140px;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	visibility: hidden;
+}
+
+.emote {
+	font-size: 48px;
+	width: fit-content;
+	position: fixed;
+	user-select: none;
+	animation: shoot 3s cubic-bezier(0.09, 0.62, 0.92, 0.37), fade 3s linear forwards;
+}
+
+.btn-emote {
+	appearance: none;
+	display: inline-block;
+	border: none;
+	border-radius: 4px;
+	background-color: transparent;
+	cursor: pointer;
+	color: #fff;
+	padding: 4px;
+	min-width: 32px;
+	min-height: 32px;
+	font-size: 24px;
+	line-height: 1;
+	user-select: none;
+	-webkit-user-select: none;
+}

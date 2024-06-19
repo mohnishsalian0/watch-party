@@ -1,167 +1,7 @@
-const users = [
-  {
-    userId: 1,
-    userName: "Angad",
-    userAvatar: "https://api.dicebear.com/8.x/adventurer/svg?seed=15",
-    isMuted: true,
-  },
-  {
-    userId: 2,
-    userName: "Jarvan",
-    userAvatar: "https://api.dicebear.com/8.x/adventurer/svg?seed=20",
-    isMuted: false,
-  },
-  {
-    userId: 3,
-    userName: "Alice",
-    userAvatar: "https://api.dicebear.com/8.x/adventurer/svg?seed=13",
-    isMuted: true,
-  },
-  {
-    userId: 3,
-    userName: "Edward",
-    userAvatar: "https://api.dicebear.com/8.x/adventurer/svg?seed=22",
-    isMuted: false,
-  },
-  {
-    userId: 4,
-    userName: "Trisha",
-    userAvatar: "https://api.dicebear.com/8.x/adventurer/svg?seed=12",
-    isMuted: true,
-  },
-  {
-    userId: 5,
-    userName: "Eragon",
-    userAvatar: "https://api.dicebear.com/8.x/adventurer/svg?seed=14",
-    isMuted: false,
-  },
-];
+// ==================== GLOBAL VARIABLES ===============
 
-const chatActivities = [
-  {
-    id: 1,
-    type: "chat-message",
-    userId: 2,
-    userName: "Jarvan",
-    userAvatar: "https://api.dicebear.com/8.x/adventurer/svg?seed=20",
-    eventIcon: "icons/pause.svg",
-    message: "This better work! Im not doing this again otherwise",
-  },
-  {
-    id: 2,
-    type: "chat-event",
-    userId: 1,
-    userName: "Angad",
-    userAvatar: "https://api.dicebear.com/8.x/adventurer/svg?seed=15",
-    eventIcon: "icons/pause.svg",
-    message:
-      "<strong class='font-medium font-white'>Angad</strong> has paused the video",
-  },
-  {
-    id: 3,
-    type: "chat-event",
-    userId: 3,
-    userName: "Alice",
-    userAvatar: "https://api.dicebear.com/8.x/adventurer/svg?seed=13",
-    eventIcon: "icons/seek-forward.svg",
-    message:
-      "<strong class='font-medium font-white'>Alice</strong> has seeked forward",
-  },
-  {
-    id: 4,
-    type: "chat-message",
-    userId: 4,
-    userName: "Trisha",
-    userAvatar: "https://api.dicebear.com/8.x/adventurer/svg?seed=12",
-    eventIcon: "",
-    message:
-      "Finally, the time has come. I don’t regret calling in sick for this 😜. Can’t wait to see the fate of YOU-KNOW-WHO. Btw how do i get the audio working?",
-  },
-];
-
-async function loadRoomData() {
-  const room = await chrome.storage.session.get(["room"]);
-  document.getElementById("link-container").textContent = room.room;
-}
-
-function handleUrlCopy(e) {
-  const room = document.getElementById("link-container").textContent;
-  navigator.clipboard
-    .writeText(room)
-    .then(() => {
-      e.target.firstChild.src = "icons/check.svg";
-      setTimeout(() => {
-        e.target.firstChild.src = "icons/link.svg";
-      }, 2000);
-      console.log("Text copied to clipboard: " + room);
-    })
-    .catch((err) => {
-      e.target.firstChild.src = "icons/cross.svg";
-      setTimeout(() => {
-        e.target.firstChild.src = "icons/link.svg";
-      }, 2000);
-      console.error("Failed to copy text to clipboard: ", err);
-    });
-}
-
-function handleLeaveRoom(e) {
-  // Disable the button and show the spinner
-  const btn = e.target;
-  const spinner = btn.querySelector("object");
-  e.target.disabled = true;
-  const svg = btn.firstChild;
-  svg.remove();
-  spinner.classList.remove("absolute");
-  spinner.classList.remove("invisible");
-
-  setTimeout(() => {
-    port.postMessage({ topic: "room:leave" });
-    e.target.disabled = false;
-    spinner.classList.add("absolute");
-    spinner.classList.add("invisible");
-    btn.appendChild(svg);
-  }, 2000);
-}
-
-function handleUserJoined(msg) {
-  console.log("jlsajdfljsldfjlsadjflaj");
-  emptyState.classList.add("hidden");
-  mainState.classList.remove("hidden");
-  mainState.classList.add("flex");
-}
-
-function loadUser(userData, userElem, usersPanel) {
-  const newUserElem = userElem.cloneNode(true);
-  newUserElem.style.display = "block";
-  newUserElem.id = userData.userId;
-  const avatar = newUserElem.querySelector("#avatar");
-  avatar.src = userData.userAvatar;
-  const name = newUserElem.querySelector("#name");
-  name.innerHTML = userData.userName;
-  name.title = userData.userName;
-  const muteIcon = newUserElem.querySelector("#mute-icon");
-  if (userData.isMuted) {
-    avatar.style.filter = "grayscale(100%)";
-    muteIcon.style.display = "block";
-  }
-  usersPanel.appendChild(newUserElem);
-}
-
-function loadChat(chatData, msgElem, eventElem, chatPanel) {
-  let newChatElem;
-  if (chatData.type === "chat-message") newChatElem = msgElem.cloneNode(true);
-  else if (chatData.type === "chat-event")
-    newChatElem = eventElem.cloneNode(true);
-  newChatElem.style.display = "flex";
-  newChatElem.id = chatData.id;
-  const image = newChatElem.querySelector("#image");
-  if (chatData.type === "chat-message") image.src = chatData.userAvatar;
-  if (chatData.type === "chat-event") image.src = chatData.eventIcon;
-  newChatElem.querySelector("#message").innerHTML = chatData.message;
-  chatPanel.appendChild(newChatElem);
-}
-
-// =============== INITIALIZATION ===============
+let selfUserData = {};
+let session = {};
 
 let emptyState;
 let mainState;
@@ -173,37 +13,236 @@ let chatPanel;
 let msgElem;
 let eventElem;
 
-let port = chrome.runtime.connect({ name: "sidepanel-background" });
+let chatInput;
 
-port.onMessage.addListener(function (msg) {
-  console.log("[Sidepanel] Receive message from background: ", msg);
-  if (msg.topic === "window:close") {
-    window.close();
-  } else if (msg.topic === "user:joined") {
-    handleUserJoined(msg);
+let port;
+
+// ==================== UTIL FUNCTIONS ===============
+
+function toggleRoomViewState(state) {
+  if (state === "main") {
+    mainState.style.display = "flex";
+    emptyState.style.display = "none";
+  } else if (state === "empty") {
+    emptyState.style.display = "block";
+    mainState.style.display = "none";
   }
-});
+}
 
-document.addEventListener("DOMContentLoaded", async () => {
-  emptyState = document.getElementById("empty-state");
+function loadUser(userData) {
+  const newUserElem = userElem.cloneNode(true);
+  newUserElem.style.display = "block";
+  newUserElem.id = userData.userId;
 
-  await loadRoomData();
+  // Set avatar
+  const avatar = newUserElem.querySelector("#avatar");
+  avatar.src = userData.userAvatar;
 
-  document
-    .getElementById("copy-link-btn")
-    .addEventListener("click", handleUrlCopy);
+  // Set name
+  const name = newUserElem.querySelector("#name");
+  name.innerHTML = userData.userName;
+  name.title = userData.userName;
 
-  const leaveBtns = document.querySelectorAll("#leave-btn");
-  leaveBtns.forEach((b) => {
-    b.addEventListener("click", handleLeaveRoom);
+  // Set host crown
+  const hostCrown = newUserElem.querySelector("#host-crown");
+  if (userData.isHost) hostCrown.style.display = "inline";
+
+  // Set mute
+  const muteIcon = newUserElem.querySelector("#mute-icon");
+  if (userData.isMuted) {
+    avatar.style.filter = "grayscale(100%)";
+    muteIcon.style.display = "block";
+  }
+  usersPanel.appendChild(newUserElem);
+}
+
+function populateUsersList(existingUsers) {
+  Object.entries(existingUsers).forEach(([id, u]) => {
+    if (id !== selfUserData.userId) {
+      loadUser(u);
+    }
   });
+}
+
+function removeUser(userData) {
+  const userElem = usersPanel.querySelector(`#${userData.userId}`);
+  userElem?.remove();
+  if (usersPanel.childElementCount === 0) toggleRoomViewState("empty");
+  console.log("[Sidepanel] Removed user from room: ", userData);
+}
+
+function loadChat(msg) {
+  let newChatElem;
+  const { messageId, messageType, messageContent, userAvatar } = msg;
+
+  if (messageType === "comment") newChatElem = msgElem.cloneNode(true);
+  else newChatElem = eventElem.cloneNode(true);
+
+  newChatElem.style.display = "flex";
+
+  newChatElem.id = messageId;
+
+  const image = newChatElem.querySelector("#image");
+  if (messageType === "comment") image.src = userAvatar;
+  else image.src = `${messageType}.svg`;
+
+  newChatElem.querySelector("#message").textContent = messageContent;
+  chatPanel.appendChild(newChatElem);
+
+  if (chatPanel.childElementCount > 50) {
+    chatPanel.removeChild(chatPanel.firstElementChild);
+  }
+}
+
+function sendComment() {
+  const messageId = Math.random().toString(36).substring(2, 12);
+  const messageType = "comment";
+  const messageContent = chatInput.value;
+
+  const message = {
+    messageId,
+    messageType,
+    messageContent,
+    ...selfUserData,
+  };
+  loadChat(message);
+  chatInput.value = "";
+
+  port.postMessage({
+    topic: "chat:message",
+    payload: { messageId, messageType, messageContent },
+  });
+}
+
+// ==================== HANDLER FUNCTIONS ===============
+
+function handleCopyRoomName(e) {
+  const room = session.room;
+  navigator.clipboard
+    .writeText(room)
+    .then(() => {
+      e.target.firstChild.src = "icons/check.svg";
+      setTimeout(() => {
+        e.target.firstChild.src = "icons/link.svg";
+      }, 1500);
+      console.log("Text copied to clipboard: " + room);
+    })
+    .catch((err) => {
+      e.target.firstChild.src = "icons/cross.svg";
+      setTimeout(() => {
+        e.target.firstChild.src = "icons/link.svg";
+      }, 1500);
+      console.error("Failed to copy text to clipboard: ", err);
+    });
+}
+
+function handleChatLog(msg) {
+  msg.payload.chatLog.forEach((cl) => {
+    loadChat(cl);
+  });
+}
+
+function handleSend() {
+  if (chatInput.value) sendComment();
+}
+
+function handleIncomingMessage(msg) {
+  loadChat(msg.payload);
+}
+
+function handleLeaveRoom(e) {
+  // Disable the button and show the spinner
+  const btn = e.target;
+  const spinner = btn.querySelector("#spinner");
+  e.target.disabled = true;
+  const exitIcon = btn.querySelector("#exit-icon");
+  exitIcon.remove();
+  spinner.classList.remove("absolute");
+  spinner.classList.remove("invisible");
+
+  setTimeout(() => {
+    port.postMessage({ topic: "room:leave" });
+    e.target.disabled = false;
+    spinner.classList.add("absolute");
+    spinner.classList.add("invisible");
+    btn.appendChild(exitIcon);
+  }, 2000);
+}
+
+function handleUserLeft(msg) {
+  removeUser(msg.payload);
+}
+
+function handleHostChange(msg) {
+  const userElem = usersPanel.querySelector(`#${msg.payload.hostId}`);
+  if (!userElem) return;
+  const hostCrown = userElem.querySelector("#host-crown");
+  hostCrown.style.display = "inline";
+}
+
+function handleEnterPress(e) {
+  if (e.key === "Enter" && e.target.value) {
+    e.preventDefault();
+    sendComment();
+  }
+}
+
+function handleSetupData(msg) {
+  const { userId, userName, userAvatar, room } = msg.payload;
+  Object.assign(selfUserData, { userId, userName, userAvatar });
+  session.room = room;
+  setDOMElements();
+}
+
+function handleUserJoined(msg) {
+  loadUser(msg.payload);
+  toggleRoomViewState("main");
+}
+
+function handleUsersList(msg) {
+  populateUsersList(msg.payload.users);
+  if (usersPanel.childElementCount > 0) {
+    toggleRoomViewState("main");
+  }
+}
+
+// ==================== MAIN FUNCTIONS ===============
+//
+// async function initStorage() {
+//   try {
+//     const userData = await chrome.storage.local.get();
+//     Object.assign(selfUserData, userData);
+//     console.log("[Sidepanel] Fetched from local storage: ", userData);
+//     const sessionData = await chrome.storage.session.get(["room"]);
+//     Object.assign(session, sessionData);
+//     console.log("[Sidepanel] Fetched from session storage: ", sessionData);
+//   } catch (e) {
+//     console.error("[Sidepanel] Failed to fetch data from local storage: ", e);
+//   }
+//
+//   chrome.storage.onChanged.addListener((changes, namespace) => {
+//     for (let [key, { _, newValue }] of Object.entries(changes)) {
+//       if (namespace === "local") selfUserData[key] = newValue;
+//     }
+//   });
+// }
+
+function setDOMElements() {
+  document.getElementById("room-name").textContent = session.room;
+  document.getElementById("link-container").textContent = session.room;
+
+  document.getElementById("self-user-avatar").src = selfUserData.userAvatar;
+  document.getElementById("self-user-name").textContent = selfUserData.userName;
+}
+
+function getDOMElements() {
+  emptyState = document.getElementById("empty-state");
 
   mainState = document.getElementById("main-state");
 
   usersPanel = document.getElementById("users-panel");
   userElem = document.getElementById("user");
-
-  users.map((user) => loadUser(user, userElem, usersPanel));
+  userElem.remove();
 
   chatPanel = document.getElementById("chat-panel");
   msgElem = chatPanel.querySelector("#chat-message");
@@ -211,40 +250,62 @@ document.addEventListener("DOMContentLoaded", async () => {
   msgElem.remove();
   eventElem.remove();
 
-  const chatInput = document.querySelector("#chat-input");
+  chatInput = document.getElementById("chat-input");
+}
 
-  chatActivities.map((activity) =>
-    loadChat(activity, msgElem, eventElem, chatPanel),
-  );
-
-  chatInput.addEventListener("keyup", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      chatData = {
-        id: 5,
-        type: "chat-message",
-        userId: 123,
-        userName: "Mohnish",
-        userAvatar: "https://api.dicebear.com/8.x/adventurer/svg?seed=22",
-        eventIcon: "",
-        message: e.target.value,
-      };
-      loadChat(chatData, msgElem, eventElem, chatPanel);
-      e.target.value = "";
-
-      chatActivities.push(chatData);
-      if (chatActivities.length > 4) {
-        chatPanel.removeChild(chatPanel.firstElementChild);
-        chatActivities.shift();
-      }
-    }
+function attachDOMListeners() {
+  document.querySelectorAll("#copy-room-name-btn").forEach((b) => {
+    b.addEventListener("click", handleCopyRoomName);
   });
 
-  // const micBtn = document.getElementById("mic-btn");
-  //
-  // const speakerBtn = document.getElementById("speaker-btn");
-  //
-  // const settingsBtn = document.getElementById("settings-btn");
-  //
-  // const leaveBtn = document.getElementById("leave-btn");
-});
+  document
+    .getElementById("leave-btn")
+    .addEventListener("click", handleLeaveRoom);
+
+  document
+    .getElementById("chat-input")
+    .addEventListener("keyup", handleEnterPress);
+
+  document.getElementById("send-btn").addEventListener("click", handleSend);
+}
+
+function setupPort() {
+  port = chrome.runtime.connect({ name: "sidepanel-background" });
+
+  port.onMessage.addListener(function (msg) {
+    console.log("[Sidepanel] Received message from background: ", msg);
+    if (msg.topic === "setup:data") {
+      handleSetupData(msg);
+    } else if (msg.topic === "window:close") {
+      window.close();
+    } else if (msg.topic === "user:joined") {
+      handleUserJoined(msg);
+    } else if (msg.topic === "room:users") {
+      handleUsersList(msg);
+    } else if (msg.topic == "user:left") {
+      handleUserLeft(msg);
+    } else if (msg.topic == "room:hostChange") {
+      handleHostChange(msg);
+    } else if (msg.topic === "chat:message") {
+      handleIncomingMessage(msg);
+    } else if (msg.topic === "chat:log") {
+      handleChatLog(msg);
+    }
+  });
+}
+
+// ==================== INITIALIZATION ===============
+
+// initStorage().then(() => {
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    getDOMElements();
+    setupPort();
+    attachDOMListeners();
+  });
+} else {
+  getDOMElements();
+  setupPort();
+  attachDOMListeners();
+}
+// });

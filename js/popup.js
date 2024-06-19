@@ -1,98 +1,160 @@
-function loadUserData() {
-  chrome.storage.local.get(["userName", "userAvatar"]).then((result) => {
-    document.getElementById("name-input").value = result.userName;
-    document.getElementById("avatar").src = result.userAvatar;
-    console.log("User data fetched: ", result);
-  });
-}
+// =============== GLOBAL VARIABLES ===============
+
+let avatarInput;
+let nameInput;
+let nameHelpText;
+let roomInput;
+let roomHelpText;
+
+let port;
+
+// ==================== UTIL FUNCTIONS ====================
 
 function generateRandomAvatar() {
   const seed = Math.floor(Math.random() * 100);
   return "https://api.dicebear.com/8.x/adventurer/svg?seed=" + seed;
 }
 
+function generateRandomRoomName() {
+  const room = "r" + Math.random().toString(36).substring(2, 9);
+  roomInput.value = room;
+}
+
+function validateForm() {
+  // Validate user name
+  const namePattern = /.+/;
+  const isNameValid = namePattern.test(nameInput.value);
+  if (!isNameValid) {
+    nameHelpText.classList.remove("hidden");
+    setTimeout(() => nameHelpText.classList.add("hidden"), 5000);
+  }
+
+  // Validate room name
+  const roomNamePattern = /^[A-Za-z0-9 ]{8,}$/;
+  const isRoomNameValid = roomNamePattern.test(roomInput.value);
+  if (!isRoomNameValid) {
+    roomHelpText.classList.remove("hidden");
+    setTimeout(() => roomHelpText.classList.add("hidden"), 5000);
+  }
+
+  if (!isNameValid || !isRoomNameValid) return false;
+
+  return true;
+}
+
+function getTabInfo(callback) {
+  let queryOptions = { active: true, lastFocusedWindow: true };
+  chrome.tabs.query(queryOptions, callback);
+}
+
+// ==================== HANDLER FUNCTIONS ====================
+
 function handleGetAvatar() {
   const userAvatar = generateRandomAvatar();
   const imgElem = document.getElementById("avatar");
   imgElem.setAttribute("src", userAvatar);
-  chrome.storage.local.set({ userAvatar }).then(() => {
-    console.log("Avatar url saved: " + userAvatar);
-  });
+  port.postMessage({ topic: "user:updateAvatar", payload: { userAvatar } });
 }
 
 function handleNameInput(e) {
-  chrome.storage.local.set({ userName: e.target.value }).then(() => {
-    console.log("Name set to: ", e.target.value);
+  port.postMessage({
+    topic: "user:updateName",
+    payload: { userName: e.target.value },
   });
 }
 
-function handleCreateRoom(e) {
+function handleJoinRoomClick(e) {
+  const isFormValid = validateForm();
+  if (!isFormValid) return;
+
   // Disable the button and show the spinner
   const btn = e.target;
-  const spinner = btn.querySelector("object");
+  const spinner = btn.querySelector("#spinner");
   e.target.disabled = true;
   btn.firstChild.textContent = "";
   spinner.classList.remove("absolute");
   spinner.classList.remove("invisible");
 
-  const room = Math.random().toString(36).substring(2, 8);
-
   setTimeout(() => {
-    port.postMessage({ topic: "room:join", payload: { room } });
-    e.target.disabled = false;
-    btn.firstChild.textContent = "Start a watch party";
-    spinner.classList.add("absolute");
-    spinner.classList.add("invisible");
-  }, 2000);
-}
+    getTabInfo(([tab]) => {
+      if (chrome.runtime.lastError)
+        console.error(
+          "[Background] Chrome tab query error: ",
+          chrome.runtime.lastError,
+        );
+      if (tab) {
+        port.postMessage({
+          topic: "room:join",
+          payload: { room: roomInput.value, tab },
+        });
+      }
+    });
 
-function handleJoinRoom(e) {
-  // Disable the button and show the spinner
-  const btn = e.target;
-  const spinner = btn.querySelector("object");
-  e.target.disabled = true;
-  btn.firstChild.textContent = "";
-  spinner.classList.remove("absolute");
-  spinner.classList.remove("invisible");
-
-  const urlInput = document.getElementById("url-input");
-
-  setTimeout(() => {
-    port.postMessage({ topic: "room:join", payload: { room: urlInput.value } });
+    // Reset button state if action failed
     e.target.disabled = false;
     btn.firstChild.textContent = "Join room";
     spinner.classList.add("absolute");
     spinner.classList.add("invisible");
-  }, 2000);
+  }, 1500);
 }
 
-// =============== INITIALIZATION ===============
+// ==================== MAIN FUNCTIONS ====================
 
-let port = chrome.runtime.connect({ name: "popup-background" });
+function getDOMElements() {
+  avatarInput = document.getElementById("avatar");
+  nameInput = document.getElementById("name-input");
+  nameHelpText = document.getElementById("name-help-text");
+  roomInput = document.getElementById("room-input");
+  roomHelpText = document.getElementById("room-help-text");
+}
 
-port.onMessage.addListener(function (msg) {
-  console.log("[Popup] Receive message from background: ", msg);
-  if (msg.topic === "window:close") {
-    window.close();
-  }
-});
+function setDOMElements(userInfo) {
+  const { userName, userAvatar } = userInfo;
+  nameInput.value = userName;
+  avatarInput.src = userAvatar;
+}
 
-document.addEventListener("DOMContentLoaded", () => {
-  loadUserData();
-
+function attachDOMListeners() {
   document
     .getElementById("get-avatar-btn")
     .addEventListener("click", handleGetAvatar);
-
+  nameInput.addEventListener("input", handleNameInput);
   document
-    .getElementById("name-input")
-    .addEventListener("input", handleNameInput);
-
-  document
-    .getElementById("start-party-btn")
-    .addEventListener("click", handleCreateRoom);
-
+    .getElementById("get-room-name-btn")
+    .addEventListener("click", generateRandomRoomName);
   document
     .getElementById("join-room-btn")
-    .addEventListener("click", handleJoinRoom);
-});
+    .addEventListener("click", handleJoinRoomClick);
+}
+
+function setupPort() {
+  port = chrome.runtime.connect({ name: "popup-background" });
+
+  port.onMessage.addListener(function (msg) {
+    console.log("[Popup] Receive message from background: ", msg);
+    if (msg.topic === "user:info") {
+      setDOMElements(msg.payload);
+    } else if (msg.topic === "room:joined") {
+      chrome.sidePanel.open({ tabId: msg.payload.tabId });
+      window.close();
+    }
+  });
+
+  port.onDisconnect.addListener(() => {
+    setupPort();
+  });
+}
+
+// ==================== INITIALIZATION ====================
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    getDOMElements();
+    setupPort();
+    attachDOMListeners();
+  });
+} else {
+  getDOMElements();
+  setupPort();
+  attachDOMListeners();
+}

@@ -28,7 +28,7 @@
   "host_permissions": ["http://www.localhost:3000/*"],
   "web_accessible_resources": [
     {
-      "resources": [ "styles.css", "pages/emote-tray.html" ],
+      "resources": [ "content.css", "styles.css", "pages/emote-tray.html" ],
       "matches": [ "<all_urls>" ]
     }
   ]
