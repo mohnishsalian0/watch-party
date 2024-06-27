@@ -3,12 +3,18 @@ importScripts("socket.io.min.js");
 // ==================== GLOBAL VARIABLES ===============
 
 let popupPort;
-let contentPort;
 let sidepanelPort;
+let contentPort;
+let voicePort;
 
 let selfUserData = {};
 let session = {};
 let notificationCounter = 0;
+let isProgrammaticChange = false;
+
+// FIXME:
+let offer;
+let candidates = [];
 
 let users = {};
 let chatLog = [];
@@ -41,7 +47,6 @@ function cacheTabInfo(tab) {
   // Store tab id & url in session variable
   session.tabId = tab.id;
   session.tabUrl = tab.url;
-  console.log(session);
 }
 
 function logChatMessage(msg) {
@@ -52,10 +57,17 @@ function logChatMessage(msg) {
 function forwardToSocket(msg) {
   if (!socket?.connected) return;
 
-  console.log("[Background] Sending message to server");
+  console.log("[Background] Sending message to server: ", msg);
   socket.emit(msg.topic, msg.payload, (result) => {
     console.log("[Background] Received callback from server: ", result);
-    popupPort.postMessage({ topic: msg.topic, payload: result });
+    popupPort?.postMessage({ topic: msg.topic, payload: result });
+  });
+}
+
+function sendUserToPopup() {
+  popupPort?.postMessage({
+    topic: "user:info",
+    payload: { ...selfUserData },
   });
 }
 
@@ -69,7 +81,7 @@ function sendUserAndRoomToSidepanel() {
 function sendUsersAndChatToSidepanel() {
   // Send users list and chat log
   sidepanelPort.postMessage({
-    topic: "room:users",
+    topic: "room:existingUsers",
     payload: { users },
   });
   sidepanelPort.postMessage({
@@ -78,78 +90,51 @@ function sendUsersAndChatToSidepanel() {
   });
 }
 
-function injectContent() {
-  // chrome.scripting
-  //   .executeScript({
-  //     target: { tabId: session.tabId },
-  //     files: ["js/content.js"],
-  //   })
-  //   .then(() => console.log("registration complete"))
-  //   .catch((err) => console.warn("unexpected error", err));
-  chrome.scripting.getRegisteredContentScripts().then((scripts) => {
-    console.log("registered content scripts", scripts);
-    if (scripts.length > 0) {
-      chrome.scripting
-        .unregisterContentScripts({ ids: ["session-script"] })
-        .then(() => {
-          chrome.scripting
-            .registerContentScripts([
-              {
-                id: "session-script",
-                js: ["js/content.js"],
-                persistAcrossSessions: false,
-                matches: ["*://*.google.co.in/*"],
-                runAt: "document_start",
-              },
-            ])
-            .then(() => console.log("registration complete"))
-            .catch((err) => console.warn("unexpected error", err));
-          console.log("un-registration complete");
-        });
-    } else {
-      chrome.scripting
-        .registerContentScripts([
-          {
-            id: "session-script",
-            js: ["js/content.js"],
-            persistAcrossSessions: false,
-            matches: ["*://*.google.co.in/*"],
-            runAt: "document_start",
-            world: "MAIN",
-          },
-        ])
-        .then(() => console.log("registration complete"))
-        .catch((err) => console.warn("unexpected error", err));
-    }
-  });
-}
-
-function showEmoteTray() {
-  contentPort?.postMessage({
-    topic: "window:open",
-  });
-}
-
-function hideEmoteTray() {
-  contentPort?.postMessage({
-    topic: "window:close",
-  });
+function injectEmoteTray() {
+  chrome.scripting
+    .executeScript({
+      target: { tabId: session.tabId },
+      files: ["js/content.js"],
+    })
+    .then(() => console.log("Injected emote tray"))
+    .catch((err) => console.warn("Unexpected error", err));
 }
 
 // ==================== HANDLER FUNCTIONS ===============
 
-function handleSidepanelPortDisconnect() {
-  sidepanelPort = undefined;
-  console.log("[Background] Sidepanel port disconnected");
-}
-
-function handleContentPortMessage(msg) {
-  forwardToSocket(msg);
-}
-
-function handleContentPortDisconnect() {
-  contentPort = undefined;
-  console.log("[Background] Content port disconnected");
+function handlePortOnConnect(port) {
+  if (port.name === "popup-background") {
+    console.log("[Background] Popup port connected");
+    popupPort = port;
+    sendUserToPopup();
+    popupPort.onMessage.addListener(handlePopupPortMessage);
+    popupPort.onDisconnect.addListener(handlePopupPortDisconnect);
+  } else if (port.name === "sidepanel-background") {
+    console.log("[Background] Sidepanel port connected");
+    sidepanelPort = port;
+    resetNotification();
+    sendUserAndRoomToSidepanel();
+    sendUsersAndChatToSidepanel();
+    sidepanelPort.onMessage.addListener(handleSidpanelPortMessage);
+    sidepanelPort.onDisconnect.addListener(handleSidepanelPortDisconnect);
+  } else if (port.name === "contentscript-background") {
+    console.log("[Background] Content port connected");
+    contentPort = port;
+    contentPort.onMessage.addListener(handleContentPortMessage);
+    contentPort.onDisconnect.addListener(handleContentPortDisconnect);
+  } else if (port.name === "voice-background") {
+    console.log("[Background] Voice port connected");
+    voicePort = port;
+    if (offer)
+      voicePort.postMessage({ topic: "call:offer", payload: { offer } });
+    if (candidates.length > 0)
+      voicePort.postMessage({
+        topic: "call:existingCandidates",
+        payload: { candidates },
+      });
+    voicePort.onMessage.addListener(handleVoicePortMessage);
+    voicePort.onDisconnect.addListener(handleVoicePortDisconnect);
+  }
 }
 
 function handlePopupPortMessage(msg) {
@@ -160,13 +145,13 @@ function handlePopupPortMessage(msg) {
     handleUserUpdateAvatar(msg);
   } else if (msg.topic === "room:join") {
     handleJoinRoom(msg);
-  } else {
-    forwardToSocket(msg);
   }
 }
 
 function handlePopupPortDisconnect() {
   console.log("[Background] Popup port disconnected");
+  popupPort.onMessage.removeListener(handlePopupPortMessage);
+  popupPort.onDisconnect.removeListener(handlePopupPortDisconnect);
   popupPort = undefined;
 }
 
@@ -176,11 +161,39 @@ function handleSidpanelPortMessage(msg) {
     handleLeaveRoom(msg);
   } else {
     if (msg.topic === "chat:message") {
-      const { userId, userName, userAvatar } = selfUserData;
-      logChatMessage({ ...msg.payload, userId, userName, userAvatar });
+      logChatMessage({ ...msg.payload, ...selfUserData });
     }
     forwardToSocket(msg);
   }
+}
+
+function handleSidepanelPortDisconnect() {
+  console.log("[Background] Sidepanel port disconnected");
+  sidepanelPort.onMessage.removeListener(handleSidpanelPortMessage);
+  sidepanelPort.onDisconnect.removeListener(handleSidepanelPortDisconnect);
+  sidepanelPort = undefined;
+}
+
+function handleContentPortMessage(msg) {
+  forwardToSocket(msg);
+}
+
+function handleContentPortDisconnect() {
+  console.log("[Background] Content port disconnected");
+  contentPort?.onMessage.removeListener(handleContentPortMessage);
+  contentPort?.onDisconnect.removeListener(handleContentPortDisconnect);
+  contentPort = undefined;
+}
+
+function handleVoicePortMessage(msg) {
+  forwardToSocket(msg);
+}
+
+function handleVoicePortDisconnect() {
+  console.log("[Background] Voice port disconnected");
+  voicePort?.onMessage.removeListener(handleVoicePortMessage);
+  voicePort?.onDisconnect.removeListener(handleVoicePortDisconnect);
+  voicePort = undefined;
 }
 
 function handleUserJoined(payload) {
@@ -202,7 +215,7 @@ function handleHostChange(payload) {
   sidepanelPort?.postMessage({ topic: "room:hostChange", payload });
 }
 
-function handleRoomUsers(payload) {
+function handleExistingRoomUsers(payload) {
   console.log("[Background] Received message from server: ", payload);
   Object.entries(payload.users).forEach(([id, u]) => {
     if (id !== selfUserData.userId) {
@@ -256,12 +269,45 @@ function handleChatReaction(payload) {
   contentPort?.postMessage({ topic: "chat:reaction", payload });
 }
 
+function handleTabRedirect(payload) {
+  console.log("[Background] Received message from server: ", payload);
+  isProgrammaticChange = true;
+  chrome.tabs.update(session.tabId, { url: payload.url });
+}
+
+function handleCallOffer(payload) {
+  console.log("[Background] Received message from server: ", payload);
+
+  // FIXME:
+
+  // voicePort?.postMessage({ topic: "call:offer", payload });
+  offer = payload.offer;
+}
+
+function handleCallAnswer(payload) {
+  console.log("[Background] Received message from server: ", payload);
+  voicePort?.postMessage({ topic: "call:answer", payload });
+}
+
+function handleExistingCallCandidates(payload) {
+  console.log("[Background] Received message from server: ", payload);
+  // FIXME:
+
+  // voicePort?.postMessage({ topic: "call:existingCandidates", payload });
+  candidates.push(...payload.candidates);
+}
+
+function handleNewCallCandidate(payload) {
+  console.log("[Background] Received message from server: ", payload);
+  voicePort?.postMessage({ topic: "call:newCandidate", payload });
+}
+
 function handleSocketConnect() {
   console.log("[Background] Socket connection established");
 
   socket.on("user:joined", handleUserJoined);
   socket.on("user:left", handleUserLeft);
-  socket.on("room:users", handleRoomUsers);
+  socket.on("room:existingUsers", handleExistingRoomUsers);
   socket.on("room:hostChange", handleHostChange);
 
   socket.on("video:play", handleVideoPlay);
@@ -271,6 +317,13 @@ function handleSocketConnect() {
 
   socket.on("chat:message", handleChatMessage);
   socket.on("chat:reaction", handleChatReaction);
+
+  socket.on("tab:redirect", handleTabRedirect);
+
+  socket.on("call:offer", handleCallOffer);
+  socket.on("call:answer", handleCallAnswer);
+  socket.on("call:existingCandidates", handleExistingCallCandidates);
+  socket.on("call:newCandidate", handleNewCallCandidate);
 
   popupPort?.postMessage({
     topic: "room:joined",
@@ -282,10 +335,15 @@ function handleSocketConnect() {
     .setPanelBehavior({ openPanelOnActionClick: true })
     .catch((error) => console.error(error));
 
-  chrome.tabs.onUpdated.addListener(handleTabUpdate);
+  chrome.webNavigation.onCommitted.addListener(handleWebNavigation);
   chrome.tabs.onRemoved.addListener(handleTabClose);
 
-  // injectContent();
+  forwardToSocket({
+    topic: "tab:url",
+    payload: { url: session.tabUrl },
+  });
+
+  socketConnectedSignalToContent();
 }
 
 function handleSocketConnectError(err) {
@@ -294,25 +352,7 @@ function handleSocketConnectError(err) {
 
 function handleSocketDisconnect() {
   console.log("[Background] Socket connection closed");
-
-  socket = undefined;
-
-  sidepanelPort?.postMessage({ topic: "window:close" });
-
-  // Do not open side panel on action button click in toolbar
-  chrome.sidePanel
-    .setPanelBehavior({ openPanelOnActionClick: false })
-    .catch((error) => console.error(error));
-
-  contentPort?.postMessage({ topic: "window:close" });
-
-  chrome.tabs.onUpdated.removeListener(handleTabUpdate);
-  chrome.tabs.onRemoved.removeListener(handleTabClose);
-
-  hideEmoteTray();
-
-  users = {};
-  chatLog = [];
+  runCleanup();
 }
 
 function handleUserUpdateAvatar(msg) {
@@ -339,17 +379,23 @@ function handleLeaveRoom() {
   socket.disconnect();
 }
 
-function handleTabUpdate(tabId, changeInfo) {
-  if (tabId === session.tabId) {
-    console.log("Session tab has changed: ", changeInfo);
-    injectContent();
+function handleWebNavigation(details) {
+  const { frameId, tabId, url } = details;
+  if (!isProgrammaticChange && frameId === 0 && tabId === session.tabId) {
+    console.log("[Background] Web navigation triggered");
+    // FIXME:
+    // forwardToSocket({
+    //   topic: "tab:redirect",
+    //   payload: { url },
+    // });
   }
+  isProgrammaticChange = false;
 }
 
 function handleTabClose(tabId) {
   if (tabId === session.tabId) {
     console.log("Session tab has closed");
-    socket.disconnect();
+    runCleanup();
   }
 }
 
@@ -402,13 +448,6 @@ async function initStorage() {
         ),
       );
   }
-
-  chrome.storage.onChanged.addListener((changes, namespace) => {
-    console.log("[Background] Local storage data has changed: ", changes);
-    for (let [key, { _, newValue }] of Object.entries(changes)) {
-      if (namespace === "local") selfUserData[key] = newValue;
-    }
-  });
 }
 
 function initSocket() {
@@ -431,42 +470,70 @@ function initSocket() {
 }
 
 function setupPorts() {
-  chrome.runtime.onConnect.addListener(function (port) {
-    if (port.name === "popup-background") {
-      console.log("[Background] Popup port connected");
+  chrome.runtime.onConnect.addListener(handlePortOnConnect);
+}
 
-      // FIXME: Remove this code after testing
-      injectContent();
+function portReadySignalToPopup() {
+  chrome.runtime.sendMessage({ backgroundPortReady: true });
+}
 
-      popupPort = port;
-      popupPort.postMessage({
-        topic: "user:info",
-        payload: { ...selfUserData },
-      });
-      popupPort.onMessage.addListener(handlePopupPortMessage);
-      popupPort.onDisconnect.addListener(handlePopupPortDisconnect);
-    } else if (port.name === "sidepanel-background") {
-      console.log("[Background] Sidepanel port connected");
-      sidepanelPort = port;
-      resetNotification();
-      sendUserAndRoomToSidepanel();
-      sendUsersAndChatToSidepanel();
-      sidepanelPort.onMessage.addListener(handleSidpanelPortMessage);
-      sidepanelPort.onDisconnect.addListener(handleSidepanelPortDisconnect);
-    } else if (port.name === "contentscript-background") {
-      console.log("[Background] Content port connected");
-      contentPort = port;
-      if (socket?.connected) showEmoteTray();
-      contentPort.onMessage.addListener(handleContentPortMessage);
-      contentPort.onDisconnect.addListener(handleContentPortDisconnect);
+function socketConnectedSignalToContent() {
+  try {
+    chrome.tabs.sendMessage(session.tabId, { socketConnected: true });
+  } catch (err) {
+    // FIXME:
+    throw new Error(`[Background] Error pinging content: ${err}`);
+  }
+}
+
+function socketDisconnectedSignalToContent() {
+  chrome.tabs.sendMessage(session.tabId, { socketDisconnected: true });
+}
+
+function runCleanup() {
+  console.log("Running cleanup...");
+  if (socket?.connected) socket.disconnect();
+  socket = undefined;
+
+  sidepanelPort?.postMessage({ topic: "window:close" });
+
+  // Do not open side panel on action button click in toolbar
+  chrome.sidePanel
+    .setPanelBehavior({ openPanelOnActionClick: false })
+    .catch((error) => console.error(error));
+
+  chrome.webNavigation.onCommitted.removeListener(handleWebNavigation);
+  chrome.tabs.onRemoved.removeListener(handleTabClose);
+
+  socketDisconnectedSignalToContent();
+
+  users = {};
+  chatLog = [];
+  resetNotification();
+}
+
+function handleOneTimeMessage(request, sender) {
+  if (request.popupOpen) {
+    console.log("[Background] Popup has loaded");
+    initStorage().then(() => {
+      setupPorts();
+      portReadySignalToPopup();
+    });
+  } else if (request.contentReady && sender.tab.id === session.tabId) {
+    console.log("[Background] Content is ready");
+    if (socket?.connected) {
+      socketConnectedSignalToContent();
     }
-  });
+  }
 }
 
 // =============== INITIALIZATION ===============
 
 onInstall();
 
+chrome.runtime.onMessage.addListener(handleOneTimeMessage);
+
+// FIXME:
 initStorage().then(() => {
   setupPorts();
 });

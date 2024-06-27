@@ -30,7 +30,7 @@ function validateForm() {
   }
 
   // Validate room name
-  const roomNamePattern = /^[A-Za-z0-9 ]{8,}$/;
+  const roomNamePattern = /^[A-Za-z0-9_]{8,}$/;
   const isRoomNameValid = roomNamePattern.test(roomInput.value);
   if (!isRoomNameValid) {
     roomHelpText.classList.remove("hidden");
@@ -48,6 +48,26 @@ function getTabInfo(callback) {
 }
 
 // ==================== HANDLER FUNCTIONS ====================
+
+function handlePortMessage(msg) {
+  console.log("[Popup] Receive message from background: ", msg);
+  if (msg.topic === "user:info") {
+    setDOMElements(msg.payload);
+  } else if (msg.topic === "room:joined") {
+    chrome.sidePanel.open({ tabId: msg.payload.tabId });
+    window.close();
+  }
+}
+
+function handlePortDisconnect() {
+  port.onMessage.removeListener(handlePortMessage);
+  port.onDisconnect.removeListener(handlePortDisconnect);
+  port = undefined;
+}
+
+function keepBackgroundActive() {
+  setInterval(() => port.postMessage({ ping: true }), 10000);
+}
 
 function handleGetAvatar() {
   const userAvatar = generateRandomAvatar();
@@ -108,6 +128,10 @@ function getDOMElements() {
   roomHelpText = document.getElementById("room-help-text");
 }
 
+function domReadySignalToBackground() {
+  chrome.runtime.sendMessage({ popupOpen: true });
+}
+
 function setDOMElements(userInfo) {
   const { userName, userAvatar } = userInfo;
   nameInput.value = userName;
@@ -127,34 +151,35 @@ function attachDOMListeners() {
     .addEventListener("click", handleJoinRoomClick);
 }
 
-function setupPort() {
-  port = chrome.runtime.connect({ name: "popup-background" });
-
-  port.onMessage.addListener(function (msg) {
-    console.log("[Popup] Receive message from background: ", msg);
-    if (msg.topic === "user:info") {
-      setDOMElements(msg.payload);
-    } else if (msg.topic === "room:joined") {
-      chrome.sidePanel.open({ tabId: msg.payload.tabId });
-      window.close();
+function onBackgroundPortReady(callback) {
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.backgroundPortReady) {
+      console.log("Background port is ready");
+      callback();
     }
   });
+}
 
-  port.onDisconnect.addListener(() => {
+function setupPort() {
+  port = chrome.runtime.connect({ name: "popup-background" });
+  port.onMessage.addListener(handlePortMessage);
+  port.onDisconnect.addListener(handlePortDisconnect);
+}
+
+function main() {
+  getDOMElements();
+  domReadySignalToBackground();
+  onBackgroundPortReady(() => {
     setupPort();
+    attachDOMListeners();
+    keepBackgroundActive();
   });
 }
 
 // ==================== INITIALIZATION ====================
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
-    getDOMElements();
-    setupPort();
-    attachDOMListeners();
-  });
+  document.addEventListener("DOMContentLoaded", main);
 } else {
-  getDOMElements();
-  setupPort();
-  attachDOMListeners();
+  main();
 }

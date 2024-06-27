@@ -2,17 +2,16 @@
 
 let selfUserData = {};
 let session = {};
+let userJoinedSound;
+let userLeftSound;
 
 let emptyState;
 let mainState;
-
 let usersPanel;
 let userElem;
-
 let chatPanel;
 let msgElem;
 let eventElem;
-
 let chatInput;
 
 let port;
@@ -116,6 +115,33 @@ function sendComment() {
 
 // ==================== HANDLER FUNCTIONS ===============
 
+function handlePortMessage(msg) {
+  console.log("[Sidepanel] Received message from background: ", msg);
+  if (msg.topic === "setup:data") {
+    handleSetupData(msg);
+  } else if (msg.topic === "window:close") {
+    window.close();
+  } else if (msg.topic === "user:joined") {
+    handleUserJoined(msg);
+  } else if (msg.topic === "room:existingUsers") {
+    handleExistingUsersList(msg);
+  } else if (msg.topic == "user:left") {
+    handleUserLeft(msg);
+  } else if (msg.topic == "room:hostChange") {
+    handleHostChange(msg);
+  } else if (msg.topic === "chat:message") {
+    handleIncomingMessage(msg);
+  } else if (msg.topic === "chat:log") {
+    handleChatLog(msg);
+  }
+}
+
+function handlePortDisconnect() {
+  port.onMessage.removeListener(handlePortMessage);
+  port.onDisconnect.removeListener(handlePortDisconnect);
+  port = undefined;
+}
+
 function handleCopyRoomName(e) {
   const room = session.room;
   navigator.clipboard
@@ -171,6 +197,7 @@ function handleLeaveRoom(e) {
 
 function handleUserLeft(msg) {
   removeUser(msg.payload);
+  userLeftSound.play();
 }
 
 function handleHostChange(msg) {
@@ -192,14 +219,17 @@ function handleSetupData(msg) {
   Object.assign(selfUserData, { userId, userName, userAvatar });
   session.room = room;
   setDOMElements();
+  userJoinedSound = new Audio("sounds/user-joined.mp3");
+  userLeftSound = new Audio("sounds/user-left.mp3");
 }
 
 function handleUserJoined(msg) {
   loadUser(msg.payload);
   toggleRoomViewState("main");
+  userJoinedSound.play();
 }
 
-function handleUsersList(msg) {
+function handleExistingUsersList(msg) {
   populateUsersList(msg.payload.users);
   if (usersPanel.childElementCount > 0) {
     toggleRoomViewState("main");
@@ -207,25 +237,6 @@ function handleUsersList(msg) {
 }
 
 // ==================== MAIN FUNCTIONS ===============
-//
-// async function initStorage() {
-//   try {
-//     const userData = await chrome.storage.local.get();
-//     Object.assign(selfUserData, userData);
-//     console.log("[Sidepanel] Fetched from local storage: ", userData);
-//     const sessionData = await chrome.storage.session.get(["room"]);
-//     Object.assign(session, sessionData);
-//     console.log("[Sidepanel] Fetched from session storage: ", sessionData);
-//   } catch (e) {
-//     console.error("[Sidepanel] Failed to fetch data from local storage: ", e);
-//   }
-//
-//   chrome.storage.onChanged.addListener((changes, namespace) => {
-//     for (let [key, { _, newValue }] of Object.entries(changes)) {
-//       if (namespace === "local") selfUserData[key] = newValue;
-//     }
-//   });
-// }
 
 function setDOMElements() {
   document.getElementById("room-name").textContent = session.room;
@@ -257,55 +268,31 @@ function attachDOMListeners() {
   document.querySelectorAll("#copy-room-name-btn").forEach((b) => {
     b.addEventListener("click", handleCopyRoomName);
   });
-
   document
     .getElementById("leave-btn")
     .addEventListener("click", handleLeaveRoom);
-
   document
     .getElementById("chat-input")
     .addEventListener("keyup", handleEnterPress);
-
   document.getElementById("send-btn").addEventListener("click", handleSend);
 }
 
 function setupPort() {
   port = chrome.runtime.connect({ name: "sidepanel-background" });
-
-  port.onMessage.addListener(function (msg) {
-    console.log("[Sidepanel] Received message from background: ", msg);
-    if (msg.topic === "setup:data") {
-      handleSetupData(msg);
-    } else if (msg.topic === "window:close") {
-      window.close();
-    } else if (msg.topic === "user:joined") {
-      handleUserJoined(msg);
-    } else if (msg.topic === "room:users") {
-      handleUsersList(msg);
-    } else if (msg.topic == "user:left") {
-      handleUserLeft(msg);
-    } else if (msg.topic == "room:hostChange") {
-      handleHostChange(msg);
-    } else if (msg.topic === "chat:message") {
-      handleIncomingMessage(msg);
-    } else if (msg.topic === "chat:log") {
-      handleChatLog(msg);
-    }
-  });
+  port.onMessage.addListener(handlePortMessage);
+  port.onDisconnect.addListener(handlePortDisconnect);
 }
 
-// ==================== INITIALIZATION ===============
-
-// initStorage().then(() => {
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
-    getDOMElements();
-    setupPort();
-    attachDOMListeners();
-  });
-} else {
+function main() {
   getDOMElements();
   setupPort();
   attachDOMListeners();
 }
-// });
+
+// ==================== INITIALIZATION ===============
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", main);
+} else {
+  main();
+}
