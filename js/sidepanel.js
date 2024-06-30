@@ -86,10 +86,11 @@ function loadChat(msg) {
   else image.src = `${messageType}.svg`;
 
   newChatElem.querySelector("#message").textContent = messageContent;
-  chatPanel.appendChild(newChatElem);
+
+  chatPanel.insertBefore(newChatElem, chatPanel.firstChild);
 
   if (chatPanel.childElementCount > 50) {
-    chatPanel.removeChild(chatPanel.firstElementChild);
+    chatPanel.removeChild(chatPanel.lastElementChild);
   }
 }
 

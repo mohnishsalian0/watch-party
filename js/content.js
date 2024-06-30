@@ -1,6 +1,6 @@
 // =============== GLOBAL VARIABLES ===============
 
-let video;
+let videos = [];
 let shadowRootContainer;
 let emoteTray;
 
@@ -83,17 +83,34 @@ function isMouseOverTray(e) {
   return left <= x && x <= right && top <= y && y <= bottom;
 }
 
+function pauseVideo(msg) {
+  videos[msg.payload.videoId].pause();
+}
+
+function playVideo(msg) {
+  videos[msg.payload.videoId].play();
+}
+
+function seekVideo(msg) {
+  const { videoId, timestamp } = msg.payload;
+  videos[videoId].currentTime = timestamp;
+}
+
+function adjustPlaybackRate(msg) {
+  const { videoId, rate } = msg.payload;
+  videos[videoId].playbackRate = rate;
+}
+
 // ==================== HANDLER FUNCTIONS ====================
 
 function handlePortConnect(msg) {
   console.log("[Watch party] Received message from background: ", msg);
   isProgrammaticChange = true;
   if (msg.topic === "chat:reaction") shootEmote(msg.payload.reaction);
-  else if (msg.topic === "video:pause") video.pause();
-  else if (msg.topic === "video:play") video.play();
-  else if (msg.topic === "video:seek") video.currentTime = msg.timestamp;
-  else if (msg.topic === "video:adjustPlaybackRate")
-    video.playbackRate = msg.rate;
+  else if (msg.topic === "video:pause") pauseVideo(msg);
+  else if (msg.topic === "video:play") playVideo(msg);
+  else if (msg.topic === "video:seek") seekVideo(msg);
+  else if (msg.topic === "video:adjustPlaybackRate") adjustPlaybackRate(msg);
 }
 
 function handlePortDisconnect() {
@@ -101,39 +118,45 @@ function handlePortDisconnect() {
   console.log("[Watch party] Port has disconnected");
 }
 
-function handlePlay() {
+function handlePlay(event) {
   if (isProgrammaticChange) {
     isProgrammaticChange = false;
     return;
   }
   console.log("[Watch party][Content script] Video resume captured");
+  const videoId = event.target.dataset.videoId;
   port?.postMessage({
     topic: "video:play",
-    payload: {},
+    payload: { videoId },
   });
 }
 
-function handlePause() {
+function handlePause(event) {
   if (isProgrammaticChange) {
     isProgrammaticChange = false;
     return;
   }
   console.log("[Watch party][Content script] Video pause captured");
+  const videoId = event.target.dataset.videoId;
   port?.postMessage({
     topic: "video:pause",
-    payload: {},
+    payload: { videoId },
   });
 }
 
-function handleSeek() {
+function handleSeek(event) {
   if (isProgrammaticChange) {
     isProgrammaticChange = false;
     return;
   }
   console.log("[Watch party][Content script] Video seek captured");
+  const videoId = event.target.dataset.videoId;
   port?.postMessage({
     topic: "video:seek",
-    payload: { timestamp: video.currentTime },
+    payload: {
+      videoId,
+      timestamp: videos[videoId].currentTime,
+    },
   });
 }
 
@@ -192,30 +215,38 @@ async function renderDom() {
   // FIXME:
 
   // Create iframe for voice call
-  iframeElem = document.createElement("iframe");
-  iframeElem.id = "voice-call-iframe";
-  iframeElem.style.position = "absolute";
-  iframeElem.style.bottom = "0";
-  iframeElem.style.zIndex = 10000;
-  iframeElem.width = "650px";
-  iframeElem.height = "750px";
-  iframeElem.allow = "microphone; camera";
-  const voiceCallFileUrl = chrome.runtime.getURL("pages/voice-call.html");
-  iframeElem.src = voiceCallFileUrl;
-  document.body.appendChild(iframeElem);
+  // iframeElem = document.createElement("iframe");
+  // iframeElem.id = "voice-call-iframe";
+  // iframeElem.style.position = "absolute";
+  // iframeElem.style.bottom = "0";
+  // iframeElem.style.zIndex = 10000;
+  // iframeElem.width = "650px";
+  // iframeElem.height = "750px";
+  // iframeElem.allow = "microphone; camera";
+  // const voiceCallFileUrl = chrome.runtime.getURL("pages/voice-call.html");
+  // iframeElem.src = voiceCallFileUrl;
+  // document.body.appendChild(iframeElem);
 }
 
 function getDOMElements() {
-  video = document.querySelector("video");
+  Array.from(document.querySelectorAll("video")).forEach((video) => {
+    video.dataset.videoId = videos.length;
+    videos.push(video);
+  });
   emoteTray = shadowRootContainer.shadowRoot.querySelector("#emote-tray");
 }
 
+function attachVideoListeners(video) {
+  video.addEventListener("play", handlePlay);
+  video.addEventListener("pause", handlePause);
+  video.addEventListener("seeked", handleSeek);
+}
+
 function attachDOMListeners() {
-  if (video) {
-    video.addEventListener("play", handlePlay);
-    video.addEventListener("pause", handlePause);
-    video.addEventListener("seeked", handleSeek);
-  }
+  // FIXME:
+  videos.forEach((video) => {
+    attachVideoListeners(video);
+  });
   emoteTray.addEventListener("click", handleEmoteTrayClick);
   document.addEventListener("fullscreenchange", handleFullscreen);
   // makeEmoteTrayDraggable();
@@ -238,10 +269,12 @@ function main() {
 }
 
 function runCleanup() {
-  video?.removeEventListener("play", handlePlay);
-  video?.removeEventListener("pause", handlePause);
-  video?.removeEventListener("seeked", handleSeek);
-  video = undefined;
+  videos.forEach((video) => {
+    video.removeEventListener("play", handlePlay);
+    video.removeEventListener("pause", handlePause);
+    video.removeEventListener("seeked", handleSeek);
+  });
+  videos = [];
 
   document.removeEventListener("fullscreenchange", handleFullscreen);
   document.removeEventListener("mousemove", handleMouseIdle);
@@ -255,8 +288,33 @@ function runCleanup() {
 }
 
 function init() {
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", main);
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.tagName === "VIDEO") {
+          console.log("video", node);
+          node.dataset.videoId = videos.length;
+          videos.push(node);
+          attachVideoListeners(node);
+        } else if (node.querySelectorAll) {
+          node.querySelectorAll("video").forEach((video) => {
+            console.log("query video", video);
+            video.dataset.videoId = videos.length;
+            videos.push(video);
+            attachVideoListeners(video);
+          });
+        }
+      });
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  if (document.readyState !== "complete") {
+    document.addEventListener("readystatechange", () => {
+      if (document.readyState === "complete") {
+        main();
+      }
+    });
   } else {
     main();
   }

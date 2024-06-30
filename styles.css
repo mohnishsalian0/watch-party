@@ -210,12 +210,20 @@ input:focus-visible {
 	flex-direction: column;
 }
 
+.flex-col-reverse {
+	flex-direction: column-reverse;
+}
+
 .flex-wrap {
 	flex-wrap: wrap;
 }
 
 .grow {
 	flex-grow: 1;
+}
+
+.shrink-0 {
+	flex-shrink: 0;
 }
 
 /* Alignment */

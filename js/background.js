@@ -12,11 +12,8 @@ let session = {};
 let notificationCounter = 0;
 let isProgrammaticChange = false;
 
-// FIXME:
-let offer;
-let candidates = [];
-
 let users = {};
+let peerConnectionUnsentMesages = [];
 let chatLog = [];
 
 let socket;
@@ -90,14 +87,11 @@ function sendUsersAndChatToSidepanel() {
   });
 }
 
-function injectEmoteTray() {
-  chrome.scripting
-    .executeScript({
-      target: { tabId: session.tabId },
-      files: ["js/content.js"],
-    })
-    .then(() => console.log("Injected emote tray"))
-    .catch((err) => console.warn("Unexpected error", err));
+function sendUnsentMessagesToVoice() {
+  while (peerConnectionUnsentMesages.length > 0) {
+    const msg = peerConnectionUnsentMesages.shift();
+    voicePort.postMessage(msg);
+  }
 }
 
 // ==================== HANDLER FUNCTIONS ===============
@@ -125,13 +119,7 @@ function handlePortOnConnect(port) {
   } else if (port.name === "voice-background") {
     console.log("[Background] Voice port connected");
     voicePort = port;
-    if (offer)
-      voicePort.postMessage({ topic: "call:offer", payload: { offer } });
-    if (candidates.length > 0)
-      voicePort.postMessage({
-        topic: "call:existingCandidates",
-        payload: { candidates },
-      });
+    sendUnsentMessagesToVoice();
     voicePort.onMessage.addListener(handleVoicePortMessage);
     voicePort.onDisconnect.addListener(handleVoicePortDisconnect);
   }
@@ -201,12 +189,14 @@ function handleUserJoined(payload) {
   const { userId } = payload;
   users[userId] = { ...payload };
   sidepanelPort?.postMessage({ topic: "user:joined", payload });
+  voicePort?.postMessage({ topic: "user:joined", payload });
 }
 
 function handleUserLeft(payload) {
   console.log("[Background] Received message from server: ", payload);
   delete users[payload.userId];
   sidepanelPort?.postMessage({ topic: "user:left", payload });
+  voicePort?.postMessage({ topic: "user:left", payload });
 }
 
 function handleHostChange(payload) {
@@ -226,13 +216,13 @@ function handleExistingRoomUsers(payload) {
 
 function handleVideoPlay(payload) {
   console.log("[Background] Received message from server:", payload);
-  contentPort?.postMessage({ topic: "video:play" });
+  contentPort?.postMessage({ topic: "video:play", payload });
   sidepanelPort?.postMessage({ topic: "video:play", payload });
 }
 
 function handleVideoPause(payload) {
   console.log("[Background] Received message from server:", payload);
-  contentPort?.postMessage({ topic: "video:pause" });
+  contentPort?.postMessage({ topic: "video:pause", payload });
   sidepanelPort?.postMessage({ topic: "video:pause", payload });
 }
 
@@ -240,7 +230,7 @@ function handleVideoSeek(payload) {
   console.log("[Background] Received message from server:", payload);
   contentPort?.postMessage({
     topic: "video:seek",
-    timestamp: payload.timestamp,
+    payload,
   });
   sidepanelPort?.postMessage({ topic: "video:seek", payload });
 }
@@ -249,7 +239,7 @@ function handleVideoPlaybackRateChange(payload) {
   console.log("[Background] Received message from server:", payload);
   contentPort?.postMessage({
     topic: "video:adjustPlaybackRate",
-    rate: payload.rate,
+    payload,
   });
   sidepanelPort?.postMessage({ topic: "video:adjustPlaybackRate", payload });
 }
@@ -277,29 +267,20 @@ function handleTabRedirect(payload) {
 
 function handleCallOffer(payload) {
   console.log("[Background] Received message from server: ", payload);
-
-  // FIXME:
-
-  // voicePort?.postMessage({ topic: "call:offer", payload });
-  offer = payload.offer;
+  if (voicePort) voicePort.postMessage({ topic: "call:offer", payload });
+  else peerConnectionUnsentMesages.push({ topic: "call:offer", payload });
 }
 
 function handleCallAnswer(payload) {
   console.log("[Background] Received message from server: ", payload);
-  voicePort?.postMessage({ topic: "call:answer", payload });
+  if (voicePort) voicePort.postMessage({ topic: "call:answer", payload });
+  else peerConnectionUnsentMesages.push({ topic: "call:answer", payload });
 }
 
-function handleExistingCallCandidates(payload) {
+function handleCallCandidate(payload) {
   console.log("[Background] Received message from server: ", payload);
-  // FIXME:
-
-  // voicePort?.postMessage({ topic: "call:existingCandidates", payload });
-  candidates.push(...payload.candidates);
-}
-
-function handleNewCallCandidate(payload) {
-  console.log("[Background] Received message from server: ", payload);
-  voicePort?.postMessage({ topic: "call:newCandidate", payload });
+  if (voicePort) voicePort.postMessage({ topic: "call:candidate", payload });
+  else peerConnectionUnsentMesages.push({ topic: "call:candidate", payload });
 }
 
 function handleSocketConnect() {
@@ -320,10 +301,9 @@ function handleSocketConnect() {
 
   socket.on("tab:redirect", handleTabRedirect);
 
-  socket.on("call:offer", handleCallOffer);
-  socket.on("call:answer", handleCallAnswer);
-  socket.on("call:existingCandidates", handleExistingCallCandidates);
-  socket.on("call:newCandidate", handleNewCallCandidate);
+  // socket.on("call:offer", handleCallOffer);
+  // socket.on("call:answer", handleCallAnswer);
+  // socket.on("call:candidate", handleCallCandidate);
 
   popupPort?.postMessage({
     topic: "room:joined",
@@ -383,11 +363,10 @@ function handleWebNavigation(details) {
   const { frameId, tabId, url } = details;
   if (!isProgrammaticChange && frameId === 0 && tabId === session.tabId) {
     console.log("[Background] Web navigation triggered");
-    // FIXME:
-    // forwardToSocket({
-    //   topic: "tab:redirect",
-    //   payload: { url },
-    // });
+    forwardToSocket({
+      topic: "tab:redirect",
+      payload: { url },
+    });
   }
   isProgrammaticChange = false;
 }
@@ -532,8 +511,3 @@ function handleOneTimeMessage(request, sender) {
 onInstall();
 
 chrome.runtime.onMessage.addListener(handleOneTimeMessage);
-
-// FIXME:
-initStorage().then(() => {
-  setupPorts();
-});

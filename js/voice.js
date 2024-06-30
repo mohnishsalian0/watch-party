@@ -1,86 +1,24 @@
 // =============== GLOBAL VARIABLES ===============
 
-let peerConnection;
+let peerConnections = {};
+let remoteStreams = {};
 let localStream;
-let remoteStream = new MediaStream();
 
-let webcamButton;
 let webcamVideo;
-let callButton;
-let answerButton;
 let remoteVideo;
-let hangupButton;
 
 let port;
 
 // =============== UTIL FUNCTIONS ===============
 
-// =============== HANDLER FUNCTIONS ===============
-
-function handlePortConnect(msg) {
-  console.log("[Watch party voice] Received message from background: ", msg);
-  if (msg.topic === "call:offer") handleOffer(msg);
-  else if (msg.topic === "call:answer") handleAnswer(msg);
-  else if (msg.topic === "call:existingCandidates")
-    handleExistingCandidatesList(msg);
-  else if (msg.topic === "call:newCandidate") handleNewCandidate(msg);
+function addVideoToDOM(userId) {
+  const newVideoElem = remoteVideo.cloneNode(true);
+  newVideoElem.id = userId;
+  newVideoElem.srcObject = remoteStreams[userId];
+  document.body.appendChild(newVideoElem);
 }
 
-function handlePortDisconnect() {
-  port = undefined;
-  console.log("[Watch party voice] Port has disconnected");
-}
-
-function handleOffer(msg) {
-  const offerDescription = new RTCSessionDescription(msg.payload.offer);
-  peerConnection.setRemoteDescription(offerDescription);
-}
-
-function handleAnswer(msg) {
-  const answerDescription = new RTCSessionDescription(msg.payload.answer);
-  peerConnection.setRemoteDescription(answerDescription);
-}
-
-function handleExistingCandidatesList(msg) {
-  msg.payload.candidates.forEach((c) => {
-    const candidate = new RTCIceCandidate(c);
-    peerConnection.addIceCandidate(candidate);
-  });
-}
-
-function handleNewCandidate(msg) {
-  const candidate = new RTCIceCandidate(msg.payload);
-  peerConnection.addIceCandidate(candidate);
-}
-
-function handleOnIceCandidate(event) {
-  event.candidate &&
-    port.postMessage({
-      topic: "call:newCandidate",
-      payload: event.candidate.toJSON(),
-    });
-}
-
-function handleOnTrack(event) {
-  // FIXME:
-  console.log("Track received asdljflasdkjfalkj");
-  event.streams[0].getTracks().forEach((track) => {
-    remoteStream.addTrack(track);
-  });
-}
-
-// =============== MAIN FUNCTIONS ===============
-
-function getDOMElements() {
-  webcamButton = document.getElementById("webcamButton");
-  webcamVideo = document.getElementById("webcamVideo");
-  callButton = document.getElementById("callButton");
-  answerButton = document.getElementById("answerButton");
-  remoteVideo = document.getElementById("remoteVideo");
-  hangupButton = document.getElementById("hangupButton");
-}
-
-function setupPeerConnection() {
+function setupPeerConnection(userId) {
   const servers = {
     iceServers: [
       {
@@ -92,13 +30,96 @@ function setupPeerConnection() {
     ],
     iceCandidatePoolSize: 10,
   };
-  peerConnection = new RTCPeerConnection(servers);
+  peerConnections[userId] = new RTCPeerConnection(servers);
 
   // Send over gathered ice candidates to server
-  peerConnection.onicecandidate = handleOnIceCandidate;
+  peerConnections[userId].onicecandidate = (event) =>
+    handleOnIceCandidate(event, userId);
+
+  // Push tracks from local stream to peer connection
+  localStream.getTracks().forEach((track) => {
+    peerConnections[userId].addTrack(track, localStream);
+  });
 
   // Pull tracks from remote stream, add to video stream
-  peerConnection.ontrack = handleOnTrack;
+  peerConnections[userId].ontrack = (event) => handleOnTrack(event, userId);
+}
+
+// =============== HANDLER FUNCTIONS ===============
+
+function handlePortConnect(msg) {
+  console.log("[Watch party voice] Received message from background: ", msg);
+  if (msg.topic === "user:joined") handleUserJoined(msg);
+  else if (msg.topic === "call:offer") handleOffer(msg);
+  else if (msg.topic === "call:answer") handleAnswer(msg);
+  else if (msg.topic === "call:candidate") handleCandidate(msg);
+}
+
+function handlePortDisconnect() {
+  port = undefined;
+  console.log("[Watch party voice] Port has disconnected");
+}
+
+async function handleUserJoined(msg) {
+  const { userId } = msg.payload;
+  setupPeerConnection(userId);
+  addVideoToDOM(userId);
+  const offerDescription = await peerConnections[userId].createOffer();
+  await peerConnections[userId].setLocalDescription(offerDescription);
+  port.postMessage({
+    topic: "call:offer",
+    payload: { offer: offerDescription, receiverId: userId },
+  });
+}
+
+async function handleOffer(msg) {
+  const { offer, senderId } = msg.payload;
+  const offerDescription = new RTCSessionDescription(offer);
+  setupPeerConnection(senderId);
+  addVideoToDOM(senderId);
+  peerConnections[senderId].setRemoteDescription(offerDescription);
+
+  const answerDescription = await peerConnections[senderId].createAnswer();
+  await peerConnections[senderId].setLocalDescription(answerDescription);
+  port.postMessage({
+    topic: "call:answer",
+    payload: { answer: answerDescription, receiverId: senderId },
+  });
+}
+
+function handleAnswer(msg) {
+  const { answer, senderId } = msg.payload;
+  const answerDescription = new RTCSessionDescription(answer);
+  peerConnections[senderId].setRemoteDescription(answerDescription);
+}
+
+function handleCandidate(msg) {
+  const { candidate, senderId } = msg.payload;
+  const iceCandidate = new RTCIceCandidate(candidate);
+  peerConnections[senderId].addIceCandidate(iceCandidate);
+}
+
+function handleOnIceCandidate(event, userId) {
+  event.candidate &&
+    port.postMessage({
+      topic: "call:candidate",
+      payload: { candidate: event.candidate.toJSON(), receiverId: userId },
+    });
+}
+
+function handleOnTrack(event, userId) {
+  remoteStreams[userId] = new MediaStream();
+  event.streams[0].getTracks().forEach((track) => {
+    remoteStreams[userId].addTrack(track);
+  });
+}
+
+// =============== MAIN FUNCTIONS ===============
+
+function getDOMElements() {
+  webcamVideo = document.getElementById("webcamVideo");
+  remoteVideo = document.getElementById("remoteVideo");
+  remoteVideo.remove();
 }
 
 function setupPort() {
@@ -107,65 +128,22 @@ function setupPort() {
   port.onDisconnect.addListener(handlePortDisconnect);
 }
 
-async function attachDOMListeners() {
-  // 1. Setup media sources
-
-  webcamButton.onclick = async () => {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      // audio: true,
-    });
-
-    // Push tracks from local stream to peer connection
-    localStream.getTracks().forEach((track) => {
-      peerConnection.addTrack(track, localStream);
-    });
-
-    webcamVideo.srcObject = localStream;
-    remoteVideo.srcObject = remoteStream;
-
-    callButton.disabled = false;
-    answerButton.disabled = false;
-    webcamButton.disabled = true;
-  };
-
-  // 2. Create an offer
-  callButton.onclick = async () => {
-    // Create offer
-    const offerDescription = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offerDescription);
-    port.postMessage({
-      topic: "call:offer",
-      payload: { offer: offerDescription },
-    });
-
-    hangupButton.disabled = false;
-  };
-
-  // 3. Answer the call with the unique ID
-  answerButton.onclick = async () => {
-    peerConnection.onicecandidate = (event) => {
-      event.candidate &&
-        port.postMessage({
-          topic: "call:candidate",
-          payload: event.candidate.toJSON(),
-        });
-    };
-
-    const answerDescription = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answerDescription);
-    port.postMessage({
-      topic: "call:answer",
-      payload: { answer: answerDescription },
-    });
-  };
+async function setupLocalStream() {
+  localStream = await navigator.mediaDevices.getUserMedia({
+    video: true,
+    // audio: true,
+  });
+  webcamVideo.srcObject = localStream;
 }
 
 function runCleanup() {
   localStream?.getTracks().forEach((track) => track.stop());
-  remoteStream?.getTracks().forEach((track) => track.stop());
-  peerConnection?.close();
-  peerConnection = undefined;
+  Object.values(remoteStreams).forEach((rs) =>
+    rs.getTracks().forEach((track) => track.stop()),
+  );
+  remoteStreams = {};
+  Object.values(peerConnections).forEach((pc) => pc.close());
+  peerConnections = {};
 
   port.disconnect();
   port = undefined;
@@ -173,9 +151,9 @@ function runCleanup() {
 
 function main() {
   getDOMElements();
-  setupPeerConnection();
-  setupPort();
-  attachDOMListeners();
+  setupLocalStream().then(() => {
+    setupPort();
+  });
 }
 
 function init() {
@@ -189,9 +167,8 @@ function init() {
 // =============== INITIALIZATION ===============
 
 init();
-
 chrome.runtime.onMessage.addListener((msg) => {
-  console.log("[Watch party voice] Received message from background: ", msg);
+  console.log("[Watch party voice] Received message: ", msg);
 
   if (msg.socketConnected) {
     console.log(
