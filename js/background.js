@@ -301,10 +301,6 @@ function handleSocketConnect() {
 
   socket.on("tab:redirect", handleTabRedirect);
 
-  // socket.on("call:offer", handleCallOffer);
-  // socket.on("call:answer", handleCallAnswer);
-  // socket.on("call:candidate", handleCallCandidate);
-
   popupPort?.postMessage({
     topic: "room:joined",
     payload: { tabId: session.tabId },

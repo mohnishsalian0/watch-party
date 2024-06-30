@@ -211,21 +211,6 @@ async function renderDom() {
   const emoteTrayHTML = await emoteTrayFile.text();
   shadowRoot.innerHTML = emoteTrayHTML;
   shadowRoot.appendChild(linkElem);
-
-  // FIXME:
-
-  // Create iframe for voice call
-  // iframeElem = document.createElement("iframe");
-  // iframeElem.id = "voice-call-iframe";
-  // iframeElem.style.position = "absolute";
-  // iframeElem.style.bottom = "0";
-  // iframeElem.style.zIndex = 10000;
-  // iframeElem.width = "650px";
-  // iframeElem.height = "750px";
-  // iframeElem.allow = "microphone; camera";
-  // const voiceCallFileUrl = chrome.runtime.getURL("pages/voice-call.html");
-  // iframeElem.src = voiceCallFileUrl;
-  // document.body.appendChild(iframeElem);
 }
 
 function getDOMElements() {
